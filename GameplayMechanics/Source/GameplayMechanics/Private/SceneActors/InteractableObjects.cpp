@@ -11,7 +11,7 @@ AInteractableObjects::AInteractableObjects()
 	PrimaryActorTick.bCanEverTick = true;
 
 	BoxTrigger = CreateDefaultSubobject<UBoxComponent>(TEXT("TriggerBoxComponent"));
-	BoxTrigger->SetupAttachment(GetRootComponent());
+	RootComponent = BoxTrigger;
 	BoxTrigger->SetBoxExtent(FVector(50.f, 50.f, 50.f));
 	BoxTrigger->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
 
@@ -35,6 +35,7 @@ void AInteractableObjects::Tick(float DeltaTime)
 
 bool AInteractableObjects::PrepareInteraction()
 {
+	UE_LOG(LogTemp, Warning, TEXT("ParentPrepare"));
 	return false;
 }
 
@@ -45,5 +46,6 @@ bool AInteractableObjects::Interaction()
 
 bool AInteractableObjects::CancelInteraction()
 {
+	UE_LOG(LogTemp, Warning, TEXT("ParentEnd"));
 	return false;
 }

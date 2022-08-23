@@ -3,7 +3,9 @@
 #include "GameplayMechanicsCharacter.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/BoxComponent.h"
 #include "Components/InputComponent.h"
+#include "Interfaces/InteractionInterface.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -47,8 +49,55 @@ AGameplayMechanicsCharacter::AGameplayMechanicsCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
+	BoxInteractionTrigger = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxInteractionTriggerComponent"));
+	BoxInteractionTrigger->SetupAttachment(GetCapsuleComponent());
+	BoxInteractionTrigger->SetBoxExtent(FVector(50.f, 50.f, 90.f));
+	BoxInteractionTrigger->SetRelativeLocation(FVector(85.f, 0.f, 0.f));
+	BoxInteractionTrigger->OnComponentBeginOverlap.AddDynamic(this, &AGameplayMechanicsCharacter::OnOverlapBegin);
+	BoxInteractionTrigger->OnComponentEndOverlap.AddDynamic(this, &AGameplayMechanicsCharacter::OnOverlapEnd);
+
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+}
+
+//////////////////////////////////////////////////////////////////////////
+// Interaction
+
+void AGameplayMechanicsCharacter::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	UE_LOG(LogTemp, Warning, TEXT("AStartOverlap"));
+	IInteractionInterface* InteractInterface = Cast<IInteractionInterface>(OtherActor);
+	InteractInterface->PrepareInteraction();
+	/*if (NumInteractableObjects == 0)
+	{
+		SelectedInteractableActor = OtherActor;
+		bStartTriggerInteractions = true;
+		IInteractInterface* InteractInterface = Cast<IInteractInterface>(OtherActor);
+		InteractInterface->PrepareToInteract();
+	}
+
+	NumInteractableObjects++;*/
+}
+
+void AGameplayMechanicsCharacter::OnOverlapEnd(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	UE_LOG(LogTemp, Warning, TEXT("AEndOverlap"));
+	IInteractionInterface* InteractInterface = Cast<IInteractionInterface>(OtherActor);
+	InteractInterface->CancelInteraction();
+	/*IInteractInterface* InteractInterface = Cast<IInteractInterface>(OtherActor);
+	InteractInterface->CancelInteraction();
+
+	NumInteractableObjects--;
+
+	if (NumInteractableObjects == 0)
+	{
+		SelectedInteractableActor = nullptr;
+		bStartTriggerInteractions = false;
+	}
+	else if (OtherActor == SelectedInteractableActor)
+	{
+		SelectCloseInteractableActor();
+	}*/
 }
 
 //////////////////////////////////////////////////////////////////////////

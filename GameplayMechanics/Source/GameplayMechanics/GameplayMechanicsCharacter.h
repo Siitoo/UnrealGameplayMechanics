@@ -18,6 +18,10 @@ class AGameplayMechanicsCharacter : public ACharacter
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class UCameraComponent* FollowCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = InteractionTrigger, meta = (AllowPrivateAccess = "true"))
+	class UBoxComponent* BoxInteractionTrigger;
+
 public:
 	AGameplayMechanicsCharacter();
 
@@ -55,6 +59,14 @@ protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	// End of APawn interface
+
+private:
+
+	UFUNCTION(meta = (AllowPrivateAccess = "true"))
+	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION(meta = (AllowPrivateAccess = "true"))
+	void OnOverlapEnd(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 public:
 	/** Returns CameraBoom subobject **/
