@@ -17,13 +17,16 @@ AInteractableObjects::AInteractableObjects()
 
 	InteractButtonWidget = CreateDefaultSubobject<UWidgetComponent>("ButtonWidget");
 	InteractButtonWidget->SetupAttachment(BoxTrigger);
+	InteractButtonWidget->SetWidgetSpace(EWidgetSpace::Screen);
+	InteractButtonWidget->SetDrawSize(FVector2D(50.f, 50.f));
+	
 }
 
 // Called when the game starts or when spawned
 void AInteractableObjects::BeginPlay()
 {
 	Super::BeginPlay();
-	
+	InteractButtonWidget->SetVisibility(false);
 }
 
 // Called every frame
@@ -35,17 +38,18 @@ void AInteractableObjects::Tick(float DeltaTime)
 
 bool AInteractableObjects::PrepareInteraction()
 {
-	UE_LOG(LogTemp, Warning, TEXT("ParentPrepare"));
+	InteractButtonWidget->SetVisibility(true);
 	return false;
 }
 
 bool AInteractableObjects::Interaction()
 {
+	UE_LOG(LogTemp, Warning, TEXT("Interact!!"));
 	return false;
 }
 
 bool AInteractableObjects::CancelInteraction()
 {
-	UE_LOG(LogTemp, Warning, TEXT("ParentEnd"));
+	InteractButtonWidget->SetVisibility(false);
 	return false;
 }

@@ -60,31 +60,71 @@ AGameplayMechanicsCharacter::AGameplayMechanicsCharacter()
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
 
+void AGameplayMechanicsCharacter::Tick(float DeltaTime)
+{
+	if (bStartTriggerInteractions && NumInteractableObjects > 1)
+	{
+		SelectCloseInteractableActor();
+	}
+
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Interaction
 
+void AGameplayMechanicsCharacter::SelectCloseInteractableActor()
+{
+	BoxInteractionTrigger->GetOverlappingActors(OverlappingActors);
+
+	AActor* OverlappedActor = nullptr;
+	float NewLength = 0.f;
+	float SelectedActorLength = (SelectedInteractableActor->GetActorLocation() - BoxInteractionTrigger->GetComponentLocation()).Length();
+
+	for (int Index = 0; Index < OverlappingActors.Num(); ++Index)
+	{
+		OverlappedActor = OverlappingActors[Index];
+		NewLength = (OverlappedActor->GetActorLocation() - BoxInteractionTrigger->GetComponentLocation()).Length();
+
+		if (NewLength < SelectedActorLength)
+		{
+			SelectedActorLength = NewLength;
+
+			IInteractionInterface* InteractInterface = Cast<IInteractionInterface>(SelectedInteractableActor);
+			InteractInterface->CancelInteraction();
+
+			SelectedInteractableActor = OverlappedActor;
+			InteractInterface = Cast<IInteractionInterface>(SelectedInteractableActor);
+			InteractInterface->PrepareInteraction();
+		}
+
+	}
+}
+
+void AGameplayMechanicsCharacter::TriggerInteraction()
+{
+	if (bStartTriggerInteractions)
+	{
+		IInteractionInterface* InteractInterface = Cast<IInteractionInterface>(SelectedInteractableActor);
+		InteractInterface->Interaction();
+	}
+}
+
 void AGameplayMechanicsCharacter::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	UE_LOG(LogTemp, Warning, TEXT("AStartOverlap"));
-	IInteractionInterface* InteractInterface = Cast<IInteractionInterface>(OtherActor);
-	InteractInterface->PrepareInteraction();
-	/*if (NumInteractableObjects == 0)
+	if (NumInteractableObjects == 0)
 	{
 		SelectedInteractableActor = OtherActor;
 		bStartTriggerInteractions = true;
-		IInteractInterface* InteractInterface = Cast<IInteractInterface>(OtherActor);
-		InteractInterface->PrepareToInteract();
+		IInteractionInterface* InteractInterface = Cast<IInteractionInterface>(OtherActor);
+		InteractInterface->PrepareInteraction();
 	}
 
-	NumInteractableObjects++;*/
+	NumInteractableObjects++;
 }
 
 void AGameplayMechanicsCharacter::OnOverlapEnd(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
-	UE_LOG(LogTemp, Warning, TEXT("AEndOverlap"));
 	IInteractionInterface* InteractInterface = Cast<IInteractionInterface>(OtherActor);
-	InteractInterface->CancelInteraction();
-	/*IInteractInterface* InteractInterface = Cast<IInteractInterface>(OtherActor);
 	InteractInterface->CancelInteraction();
 
 	NumInteractableObjects--;
@@ -97,7 +137,7 @@ void AGameplayMechanicsCharacter::OnOverlapEnd(class UPrimitiveComponent* Overla
 	else if (OtherActor == SelectedInteractableActor)
 	{
 		SelectCloseInteractableActor();
-	}*/
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -109,6 +149,7 @@ void AGameplayMechanicsCharacter::SetupPlayerInputComponent(class UInputComponen
 	check(PlayerInputComponent);
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
+	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AGameplayMechanicsCharacter::TriggerInteraction);
 
 	PlayerInputComponent->BindAxis("Move Forward / Backward", this, &AGameplayMechanicsCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("Move Right / Left", this, &AGameplayMechanicsCharacter::MoveRight);

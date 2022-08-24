@@ -31,6 +31,9 @@ public:
 
 protected:
 
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
+
 	/** Called for forwards/backward input */
 	void MoveForward(float Value);
 
@@ -68,10 +71,23 @@ private:
 	UFUNCTION(meta = (AllowPrivateAccess = "true"))
 	void OnOverlapEnd(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
+	void TriggerInteraction();
+
+	void SelectCloseInteractableActor();
+
 public:
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+private:
+
+	bool bStartTriggerInteractions = false;
+	TArray<AActor*> OverlappingActors;
+
+	AActor* SelectedInteractableActor;
+	int NumInteractableObjects;
+
 };
 
