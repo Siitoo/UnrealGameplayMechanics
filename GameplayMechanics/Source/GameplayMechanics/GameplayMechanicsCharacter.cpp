@@ -9,6 +9,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AGameplayMechanicsCharacter
@@ -56,6 +57,13 @@ AGameplayMechanicsCharacter::AGameplayMechanicsCharacter()
 	BoxInteractionTrigger->OnComponentBeginOverlap.AddDynamic(this, &AGameplayMechanicsCharacter::OnOverlapBegin);
 	BoxInteractionTrigger->OnComponentEndOverlap.AddDynamic(this, &AGameplayMechanicsCharacter::OnOverlapEnd);
 
+	bStartTriggerInteractions = false;
+	SelectedInteractableActor = nullptr;
+	NumInteractableObjects = 0;
+
+	MaxDistanceFromWall = 100.f;
+	MaxHeightToJump = 300.f;
+
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
@@ -66,6 +74,27 @@ void AGameplayMechanicsCharacter::Tick(float DeltaTime)
 	{
 		SelectCloseInteractableActor();
 	}
+
+	//TEST FOR JUMP------------------------------------------
+	FVector LineStart = GetActorLocation();
+	FVector LineEnd = GetActorLocation() + GetCapsuleComponent()->GetForwardVector() * MaxDistanceFromWall;
+	UWorld* World = GetWorld();
+
+
+	FCollisionQueryParams CollisionParams;
+
+	bCanJumpToClimb = World->LineTraceSingleByObjectType(OutHitForWallJump, LineStart, LineEnd, ECC_WorldStatic, CollisionParams);
+
+	if (bCanJumpToClimb)
+	{
+		DrawDebugLine(World, LineStart, LineEnd, FColor::Red);
+	}
+	else
+	{
+		DrawDebugLine(World, LineStart, LineEnd, FColor::Green);
+	}
+
+	//--------------------------------------
 
 }
 
@@ -147,7 +176,7 @@ void AGameplayMechanicsCharacter::SetupPlayerInputComponent(class UInputComponen
 {
 	// Set up gameplay key bindings
 	check(PlayerInputComponent);
-	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
+	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &AGameplayMechanicsCharacter::ProcessJump);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
 	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AGameplayMechanicsCharacter::TriggerInteraction);
 
@@ -215,5 +244,35 @@ void AGameplayMechanicsCharacter::MoveRight(float Value)
 		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 		// add movement in that direction
 		AddMovementInput(Direction, Value);
+	}
+}
+
+void AGameplayMechanicsCharacter::ProcessJump()
+{
+	if (bCanJumpToClimb)
+	{
+		UWorld* World = GetWorld();
+		FVector LineStart = OutHitForWallJump.ImpactPoint;
+		FVector LineEnd = OutHitForWallJump.ImpactPoint + FVector::UpVector * MaxHeightToJump;
+		OutHitForWallJump.bStartPenetrating = true;
+		TArray<AActor*> ActorsToIgnore;
+
+		bool bLineTraceHit = UKismetSystemLibrary::SphereTraceSingle(World, LineEnd, LineStart, 10.f, ETraceTypeQuery::TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForDuration, OutHitForWallJump, true);
+
+		if (bLineTraceHit)
+		{
+			DrawDebugLine(World, OutHitForWallJump.ImpactPoint, OutHitForWallJump.ImpactPoint + OutHitForWallJump.ImpactNormal * 50.f, FColor::Cyan, false, 5.f);
+		}
+	}
+	else
+	{
+		if (GetCharacterMovement()->IsJumpAllowed())
+		{
+			ACharacter::Jump();
+		}
+		else
+		{
+			ACharacter::StopJumping();
+		}
 	}
 }

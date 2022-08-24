@@ -29,10 +29,18 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Input)
 	float TurnRateGamepad;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Jump Detection")
+	float MaxDistanceFromWall;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Jump Detection")
+	float MaxHeightToJump;
+
 protected:
 
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+
+	void ProcessJump();
 
 	/** Called for forwards/backward input */
 	void MoveForward(float Value);
@@ -89,5 +97,7 @@ private:
 	AActor* SelectedInteractableActor;
 	int NumInteractableObjects;
 
+	bool bCanJumpToClimb = false;
+	FHitResult OutHitForWallJump;
 };
 
