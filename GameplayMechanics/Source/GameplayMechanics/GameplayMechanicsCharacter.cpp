@@ -10,6 +10,7 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Kismet/KismetMathLibrary.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AGameplayMechanicsCharacter
@@ -221,7 +222,7 @@ void AGameplayMechanicsCharacter::LookUpAtRate(float Rate)
 
 void AGameplayMechanicsCharacter::MoveForward(float Value)
 {
-	if ((Controller != nullptr) && (Value != 0.0f))
+	if ((Controller != nullptr) && (Value != 0.0f) && !bJumpToClimb)
 	{
 		// find out which way is forward
 		const FRotator Rotation = Controller->GetControlRotation();
@@ -235,7 +236,7 @@ void AGameplayMechanicsCharacter::MoveForward(float Value)
 
 void AGameplayMechanicsCharacter::MoveRight(float Value)
 {
-	if ( (Controller != nullptr) && (Value != 0.0f) )
+	if ( (Controller != nullptr) && (Value != 0.0f) && !bJumpToClimb)
 	{
 		// find out which way is right
 		const FRotator Rotation = Controller->GetControlRotation();
@@ -248,23 +249,74 @@ void AGameplayMechanicsCharacter::MoveRight(float Value)
 	}
 }
 
+//////////////////////////////////////////////////////////////////////////
+// JUMP
+
 void AGameplayMechanicsCharacter::ProcessJump()
 {
+	bool bLineTraceHit = false;
+	UWorld* World = GetWorld();
+
+	FVector WallLocation = OutHitForWallJump.Location;
+	FVector WallNormal = OutHitForWallJump.Normal;
+
 	if (bCanJumpToClimb)
 	{
-		UWorld* World = GetWorld();
 		FVector LineStart = OutHitForWallJump.ImpactPoint;
 		FVector LineEnd = OutHitForWallJump.ImpactPoint + FVector::UpVector * MaxHeightToJump;
 		OutHitForWallJump.bStartPenetrating = true;
 		TArray<AActor*> ActorsToIgnore;
 
-		bool bLineTraceHit = UKismetSystemLibrary::SphereTraceSingle(World, LineEnd, LineStart, 10.f, ETraceTypeQuery::TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForDuration, OutHitForWallJump, true);
+		bLineTraceHit = UKismetSystemLibrary::SphereTraceSingle(World, LineEnd, LineStart, 10.f, ETraceTypeQuery::TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForDuration, OutHitForWallJump, true);
 
-		if (bLineTraceHit)
+		if (OutHitForWallJump.ImpactNormal != FVector::UpVector)
 		{
-			DrawDebugLine(World, OutHitForWallJump.ImpactPoint, OutHitForWallJump.ImpactPoint + OutHitForWallJump.ImpactNormal * 50.f, FColor::Cyan, false, 5.f);
-			bJumpToClimb = true;
+			bLineTraceHit = false;
 		}
+
+	}
+
+	if (bLineTraceHit)
+	{
+		DrawDebugLine(World, OutHitForWallJump.ImpactPoint, OutHitForWallJump.ImpactPoint + OutHitForWallJump.ImpactNormal * 50.f, FColor::Cyan, false, 5.f);
+		
+		FVector WallNormalWithOffset = WallNormal * 30.f;
+		float ZLocation = OutHitForWallJump.Location.Z - 80.f;
+		FVector PositionVector = FVector(WallLocation.X + WallNormalWithOffset.X, WallLocation.Y + WallNormalWithOffset.Y, ZLocation);
+
+		if (!bJumpToClimb && ZLocation > 100.f)
+		{
+			bJumpToClimb = true;
+
+			GetCharacterMovement()->StopMovementImmediately();
+			GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Flying);
+
+			FVector WallNormalInvert = WallNormal * -1.0f;
+
+			FRotator Rotation = UKismetMathLibrary::MakeRotFromX(WallNormalInvert);
+
+			//FRotator Rotation = FRotator::ZeroRotator;
+
+			//Try to change for move component to
+			//GetCapsuleComponent()->SetWorldLocation(PositionVector, false, nullptr, ETeleportType::None);
+
+			FLatentActionInfo LatentInfo;
+			LatentInfo.CallbackTarget = this;
+			UCapsuleComponent* Capsule = GetCapsuleComponent();
+			UKismetSystemLibrary::MoveComponentTo(Capsule, PositionVector, Rotation, true, true, 0.3f, true, EMoveComponentAction::Move, LatentInfo);
+
+			//By Default the Mesh position is 0,0,-90
+
+			FVector MeshRelativeLocation = GetMesh()->GetRelativeLocation();
+			//ofsset to mesh for clipping and distance
+			MeshRelativeLocation.X = -28.f;
+			MeshRelativeLocation.Z -= 65.f;//PositionVector.Z / 3.f;
+
+			GetMesh()->SetRelativeLocation(MeshRelativeLocation);
+
+
+		}
+		
 	}
 	else
 	{
