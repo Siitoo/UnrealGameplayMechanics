@@ -96,8 +96,11 @@ private:
 
 	AActor* SelectedInteractableActor;
 	int NumInteractableObjects;
-
 	bool bCanJumpToClimb = false;
 	FHitResult OutHitForWallJump;
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+	bool bJumpToClimb = false;
 };
 

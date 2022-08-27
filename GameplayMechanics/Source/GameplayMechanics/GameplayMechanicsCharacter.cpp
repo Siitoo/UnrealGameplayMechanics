@@ -92,6 +92,7 @@ void AGameplayMechanicsCharacter::Tick(float DeltaTime)
 	else
 	{
 		DrawDebugLine(World, LineStart, LineEnd, FColor::Green);
+		bJumpToClimb = false;
 	}
 
 	//--------------------------------------
@@ -262,6 +263,7 @@ void AGameplayMechanicsCharacter::ProcessJump()
 		if (bLineTraceHit)
 		{
 			DrawDebugLine(World, OutHitForWallJump.ImpactPoint, OutHitForWallJump.ImpactPoint + OutHitForWallJump.ImpactNormal * 50.f, FColor::Cyan, false, 5.f);
+			bJumpToClimb = true;
 		}
 	}
 	else
