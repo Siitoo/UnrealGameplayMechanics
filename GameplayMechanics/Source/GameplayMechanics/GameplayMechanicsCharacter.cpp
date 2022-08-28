@@ -77,23 +77,27 @@ void AGameplayMechanicsCharacter::Tick(float DeltaTime)
 	}
 
 	//TEST FOR JUMP------------------------------------------
-	FVector LineStart = GetActorLocation();
-	FVector LineEnd = GetActorLocation() + GetCapsuleComponent()->GetForwardVector() * MaxDistanceFromWall;
-	UWorld* World = GetWorld();
-
-
-	FCollisionQueryParams CollisionParams;
-
-	bCanJumpToClimb = World->LineTraceSingleByObjectType(OutHitForWallJump, LineStart, LineEnd, ECC_WorldStatic, CollisionParams);
-
-	if (bCanJumpToClimb)
+	
+	if (!bJumpToClimb)
 	{
-		DrawDebugLine(World, LineStart, LineEnd, FColor::Red);
-	}
-	else
-	{
-		DrawDebugLine(World, LineStart, LineEnd, FColor::Green);
-		bJumpToClimb = false;
+		FVector LineStart = GetActorLocation();
+		FVector LineEnd = GetActorLocation() + GetCapsuleComponent()->GetForwardVector() * MaxDistanceFromWall;
+		UWorld* World = GetWorld();
+
+
+		FCollisionQueryParams CollisionParams;
+
+		bCanJumpToClimb = World->LineTraceSingleByObjectType(OutHitForWallJump, LineStart, LineEnd, ECC_WorldStatic, CollisionParams);
+
+		if (bCanJumpToClimb)
+		{
+			DrawDebugLine(World, LineStart, LineEnd, FColor::Red);
+		}
+		else
+		{
+			DrawDebugLine(World, LineStart, LineEnd, FColor::Green);
+			bJumpToClimb = false;
+		}
 	}
 
 	//--------------------------------------
@@ -222,15 +226,36 @@ void AGameplayMechanicsCharacter::LookUpAtRate(float Rate)
 
 void AGameplayMechanicsCharacter::MoveForward(float Value)
 {
-	if ((Controller != nullptr) && (Value != 0.0f) && !bJumpToClimb)
+	if ((Controller != nullptr))
 	{
-		// find out which way is forward
-		const FRotator Rotation = Controller->GetControlRotation();
-		const FRotator YawRotation(0, Rotation.Yaw, 0);
+		if ((Value != 0.0f))
+		{
+			if (!bJumpToClimb)
+			{
+				// find out which way is forward
+				const FRotator Rotation = Controller->GetControlRotation();
+				const FRotator YawRotation(0, Rotation.Yaw, 0);
 
-		// get forward vector
-		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-		AddMovementInput(Direction, Value);
+				// get forward vector
+				const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+				AddMovementInput(Direction, Value);
+			}
+			else
+			{
+				if (Value > 0.0f)
+				{
+					HangToClimbUp();
+				}
+				else
+				{
+					if (!bHangOff)
+					{
+						bHangOff = true;
+					}	
+				}
+			}
+		}
+		
 	}
 }
 
@@ -329,4 +354,61 @@ void AGameplayMechanicsCharacter::ProcessJump()
 			ACharacter::StopJumping();
 		}
 	}
+}
+
+void AGameplayMechanicsCharacter::HangToClimbUp()
+{
+	bClimbUp = true;
+
+	FVector NewCapsuleLocation = OutHitForWallJump.ImpactPoint;
+	NewCapsuleLocation.Z += 96.f;
+
+	FLatentActionInfo LatentInfo2;
+	LatentInfo2.CallbackTarget = this;
+	FVector OriginalMeshRelativeLocation = FVector(0.f, 0.f, -230.f);;
+	FRotator OriginalMeshRelativeRotator = FRotator(0.f, 270.f, 0.f);
+	UKismetSystemLibrary::MoveComponentTo(GetMesh(), OriginalMeshRelativeLocation, OriginalMeshRelativeRotator, true, true, 1.f, true, EMoveComponentAction::Move, LatentInfo2);
+	
+
+
+	FLatentActionInfo LatentInfo;
+	LatentInfo.CallbackTarget = this;
+	LatentInfo.ExecutionFunction = "ResetClimb";
+	LatentInfo.UUID = 1;
+	LatentInfo.Linkage = 0;
+	UCapsuleComponent* Capsule = GetCapsuleComponent();
+	UKismetSystemLibrary::MoveComponentTo(Capsule, NewCapsuleLocation, GetActorRotation(), true, true, 1.3f, true, EMoveComponentAction::Move, LatentInfo);
+
+}
+
+void AGameplayMechanicsCharacter::HangOff()
+{
+	FVector OriginalMeshRelativeLocation = FVector(0.f, 0.f, -90.f);
+	GetMesh()->SetRelativeLocation(OriginalMeshRelativeLocation);
+
+	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Falling);
+
+
+	ResetClimb();
+}
+
+void AGameplayMechanicsCharacter::ResetClimb()
+{
+	FVector OriginalMeshRelativeLocation = FVector(0.f, 0.f, -90.f);
+	GetMesh()->SetRelativeLocation(OriginalMeshRelativeLocation);
+
+	if (bClimbUp)
+	{
+		GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
+	}
+	else
+	{
+		GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Falling);
+	}
+
+	
+	bCanJumpToClimb = false;
+	bJumpToClimb = false;
+	bClimbUp = false;
+	bHangOff = false;
 }

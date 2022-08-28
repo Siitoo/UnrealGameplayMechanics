@@ -42,6 +42,11 @@ protected:
 
 	void ProcessJump();
 
+	void HangToClimbUp();
+
+	UFUNCTION(BlueprintCallable)
+	void HangOff();
+
 	/** Called for forwards/backward input */
 	void MoveForward(float Value);
 
@@ -83,11 +88,16 @@ private:
 
 	void SelectCloseInteractableActor();
 
+	
+
 public:
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+	UFUNCTION()
+	void ResetClimb();
 
 private:
 
@@ -102,5 +112,11 @@ private:
 public:
 	UPROPERTY(BlueprintReadOnly)
 	bool bJumpToClimb = false;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bClimbUp = false;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bHangOff = false;
 };
 
