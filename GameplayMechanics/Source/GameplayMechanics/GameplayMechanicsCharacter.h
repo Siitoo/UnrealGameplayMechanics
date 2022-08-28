@@ -91,7 +91,7 @@ private:
 
 	void SelectCloseInteractableActor();
 
-	
+	void WallDetection();
 
 public:
 	/** Returns CameraBoom subobject **/
@@ -102,27 +102,32 @@ public:
 	UFUNCTION()
 	void ResetClimb();
 
+	UFUNCTION(BlueprintCallable)
+	void ToggleBlockInput();
+
 private:
 
-	bool bStartTriggerInteractions = false;
+	bool bStartTriggerInteractions;
 	TArray<AActor*> OverlappingActors;
 
 	AActor* SelectedInteractableActor;
 	int NumInteractableObjects;
-	bool bCanJumpToClimb = false;
+	bool bCanJumpToClimb;
 	FHitResult OutHitForWallJump;
+
+	bool bBlockInput;
 
 	FVector WallLocation;
 	FVector WallNormal;
 
 public:
 	UPROPERTY(BlueprintReadOnly)
-	bool bJumpToClimb = false;
+	bool bJumpToClimb;
 
 	UPROPERTY(BlueprintReadOnly)
-	bool bClimbUp = false;
+	bool bClimbUp;
 
 	UPROPERTY(BlueprintReadOnly)
-	bool bHangOff = false;
+	bool bHangOff;
 };
 

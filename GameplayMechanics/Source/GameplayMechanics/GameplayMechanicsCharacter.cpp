@@ -58,12 +58,22 @@ AGameplayMechanicsCharacter::AGameplayMechanicsCharacter()
 	BoxInteractionTrigger->OnComponentBeginOverlap.AddDynamic(this, &AGameplayMechanicsCharacter::OnOverlapBegin);
 	BoxInteractionTrigger->OnComponentEndOverlap.AddDynamic(this, &AGameplayMechanicsCharacter::OnOverlapEnd);
 
+	bBlockInput = false;
+
+	// Interaction
 	bStartTriggerInteractions = false;
 	SelectedInteractableActor = nullptr;
 	NumInteractableObjects = 0;
 
+	//Climbable wall detection
 	MaxDistanceFromWall = 100.f;
 	MaxHeightToJump = 300.f;
+
+	//Climb controllers
+	bCanJumpToClimb = false;
+	bJumpToClimb = false;
+	bClimbUp = false;
+	bHangOff = false;
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
@@ -75,33 +85,11 @@ void AGameplayMechanicsCharacter::Tick(float DeltaTime)
 	{
 		SelectCloseInteractableActor();
 	}
-
-	//TEST FOR JUMP------------------------------------------
 	
 	if (!bJumpToClimb)
 	{
-		FVector LineStart = GetActorLocation();
-		FVector LineEnd = GetActorLocation() + GetCapsuleComponent()->GetForwardVector() * MaxDistanceFromWall;
-		UWorld* World = GetWorld();
-
-
-		FCollisionQueryParams CollisionParams;
-
-		bCanJumpToClimb = World->LineTraceSingleByObjectType(OutHitForWallJump, LineStart, LineEnd, ECC_WorldStatic, CollisionParams);
-
-		if (bCanJumpToClimb)
-		{
-			DrawDebugLine(World, LineStart, LineEnd, FColor::Red);
-		}
-		else
-		{
-			DrawDebugLine(World, LineStart, LineEnd, FColor::Green);
-			bJumpToClimb = false;
-		}
+		WallDetection();
 	}
-
-	//--------------------------------------
-
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -202,6 +190,11 @@ void AGameplayMechanicsCharacter::SetupPlayerInputComponent(class UInputComponen
 	PlayerInputComponent->BindTouch(IE_Released, this, &AGameplayMechanicsCharacter::TouchStopped);
 }
 
+void AGameplayMechanicsCharacter::ToggleBlockInput() 
+{
+	bBlockInput = !bBlockInput;
+}
+
 void AGameplayMechanicsCharacter::TouchStarted(ETouchIndex::Type FingerIndex, FVector Location)
 {
 	Jump();
@@ -228,7 +221,7 @@ void AGameplayMechanicsCharacter::MoveForward(float Value)
 {
 	if ((Controller != nullptr))
 	{
-		if ((Value != 0.0f))
+		if ((Value != 0.0f) && !bBlockInput)
 		{
 			if (!bJumpToClimb)
 			{
@@ -261,7 +254,7 @@ void AGameplayMechanicsCharacter::MoveForward(float Value)
 
 void AGameplayMechanicsCharacter::MoveRight(float Value)
 {
-	if ( (Controller != nullptr) && (Value != 0.0f) && !bJumpToClimb)
+	if ( (Controller != nullptr) && (Value != 0.0f) && !bJumpToClimb && !bBlockInput)
 	{
 		// find out which way is right
 		const FRotator Rotation = Controller->GetControlRotation();
@@ -277,45 +270,61 @@ void AGameplayMechanicsCharacter::MoveRight(float Value)
 //////////////////////////////////////////////////////////////////////////
 // JUMP
 
-void AGameplayMechanicsCharacter::ProcessJump()
+void AGameplayMechanicsCharacter::WallDetection()
 {
-	bool bLineTraceHit = false;
 	UWorld* World = GetWorld();
 
-	WallLocation = OutHitForWallJump.Location;
-	WallNormal = OutHitForWallJump.Normal;
+	FVector LineStart = GetActorLocation();
+	FVector LineEnd = GetActorLocation() + GetCapsuleComponent()->GetForwardVector() * MaxDistanceFromWall;
+
+	FCollisionQueryParams CollisionParams;
+
+	bCanJumpToClimb = World->LineTraceSingleByObjectType(OutHitForWallJump, LineStart, LineEnd, ECC_WorldStatic, CollisionParams);
+
+	if (!bCanJumpToClimb)
+	{
+		bJumpToClimb = false;
+	}
+}
+
+void AGameplayMechanicsCharacter::ProcessJump()
+{
+	UWorld* World = GetWorld();
+	bool bLineTraceHit = false;
 
 	if (bCanJumpToClimb)
 	{
-		FVector LineStart = OutHitForWallJump.ImpactPoint;
-		FVector LineEnd = OutHitForWallJump.ImpactPoint + FVector::UpVector * MaxHeightToJump;
-		OutHitForWallJump.bStartPenetrating = true;
+		WallLocation = OutHitForWallJump.Location;
+		WallNormal = OutHitForWallJump.Normal;
+
+		FVector LineStart =  OutHitForWallJump.ImpactPoint + FVector::UpVector * MaxHeightToJump;
+		FVector LineEnd = OutHitForWallJump.ImpactPoint;
 		TArray<AActor*> ActorsToIgnore;
 
-		bLineTraceHit = UKismetSystemLibrary::SphereTraceSingle(World, LineEnd, LineStart, 10.f, ETraceTypeQuery::TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForDuration, OutHitForWallJump, true);
+		bLineTraceHit = UKismetSystemLibrary::SphereTraceSingle(World, LineStart, LineEnd, 10.f, ETraceTypeQuery::TraceTypeQuery1, false, ActorsToIgnore, EDrawDebugTrace::ForDuration, OutHitForWallJump, true);
 
+		// To exclude wall that is larger than the sphere trace LineEnd
 		if (OutHitForWallJump.ImpactNormal != FVector::UpVector)
 		{
 			bLineTraceHit = false;
 		}
-
 	}
 
-	if (bLineTraceHit)
-	{
-		DrawDebugLine(World, OutHitForWallJump.ImpactPoint, OutHitForWallJump.ImpactPoint + OutHitForWallJump.ImpactNormal * 50.f, FColor::Cyan, false, 5.f);
-		
-		float ZLocation = OutHitForWallJump.Location.Z - 80.f;
+	//offset for hitted object that are small
+	float ZLocation = OutHitForWallJump.Location.Z - GetActorLocation().Z;
 
-		if (!bJumpToClimb && ZLocation > 100.f)
+	if (bLineTraceHit && ZLocation > 60.f)
+	{	
+		UE_LOG(LogTemp, Warning, TEXT("%s"), *FString::SanitizeFloat(ZLocation));
+		if (!bJumpToClimb)
 		{
+			ToggleBlockInput();
 			bJumpToClimb = true;
-		}
-		
+		}	
 	}
 	else
 	{
-		if (GetCharacterMovement()->IsJumpAllowed())
+		if (GetCharacterMovement()->IsJumpAllowed() && !bBlockInput)
 		{
 			ACharacter::Jump();
 		}
@@ -330,72 +339,59 @@ void AGameplayMechanicsCharacter::StartJumpToClimb()
 {
 	float ZLocation = OutHitForWallJump.Location.Z - 80.f;
 	FVector WallNormalWithOffset = WallNormal * 30.f;
+	FVector WallNormalInvert = WallNormal * -1.0f;
+
 	FVector PositionVector = FVector(WallLocation.X + WallNormalWithOffset.X, WallLocation.Y + WallNormalWithOffset.Y, ZLocation);
+	FRotator Rotation = UKismetMathLibrary::MakeRotFromX(WallNormalInvert);
 
 	GetCharacterMovement()->StopMovementImmediately();
 	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Flying);
 
-	FVector WallNormalInvert = WallNormal * -1.0f;
+	//By Default the Mesh position is 0,0,-90
+	FVector MeshRelativeLocation = GetMesh()->GetRelativeLocation();
 
-	FRotator Rotation = UKismetMathLibrary::MakeRotFromX(WallNormalInvert);
+	//By Default the Mesh rotation is 270 on Z
+	FRotator OriginalMeshRelativeRotator = FRotator(0.f, 270.f, 0.f);
+
+	//ofsset to mesh for clipping and distance
+	MeshRelativeLocation.X = -28.f;
+	MeshRelativeLocation.Z -= 65.f;
 
 	FLatentActionInfo LatentInfo;
 	LatentInfo.CallbackTarget = this;
-	UCapsuleComponent* Capsule = GetCapsuleComponent();
-	UKismetSystemLibrary::MoveComponentTo(Capsule, PositionVector, Rotation, true, true, 0.3f, true, EMoveComponentAction::Move, LatentInfo);
 
-	//By Default the Mesh position is 0,0,-90
+	UKismetSystemLibrary::MoveComponentTo(GetCapsuleComponent(), PositionVector, Rotation, true, true, 0.3f, true, EMoveComponentAction::Move, LatentInfo);
 
-	FVector MeshRelativeLocation = GetMesh()->GetRelativeLocation();
-	//ofsset to mesh for clipping and distance
-	MeshRelativeLocation.X = -28.f;
-	MeshRelativeLocation.Z -= 65.f;//PositionVector.Z / 3.f;
+	LatentInfo.UUID = 1;
 
-	FRotator OriginalMeshRelativeRotator = FRotator(0.f, 270.f, 0.f);
-
-	FLatentActionInfo LatentInfo2;
-	LatentInfo2.CallbackTarget = this;
-	LatentInfo2.UUID = 1;
-	UKismetSystemLibrary::MoveComponentTo(GetMesh(), MeshRelativeLocation, OriginalMeshRelativeRotator, true, true, 0.6f, true, EMoveComponentAction::Move, LatentInfo2);
-	//GetMesh()->SetRelativeLocation(MeshRelativeLocation);
-
+	UKismetSystemLibrary::MoveComponentTo(GetMesh(), MeshRelativeLocation, OriginalMeshRelativeRotator, true, true, 0.6f, true, EMoveComponentAction::Move, LatentInfo);
 }
 
 void AGameplayMechanicsCharacter::HangToClimbUp()
 {
-	bClimbUp = true;
-
-	FVector NewCapsuleLocation = OutHitForWallJump.ImpactPoint;
-	NewCapsuleLocation.Z += 96.f;
-
-	FLatentActionInfo LatentInfo2;
-	LatentInfo2.CallbackTarget = this;
 	FVector OriginalMeshRelativeLocation = FVector(0.f, 0.f, -230.f);;
 	FRotator OriginalMeshRelativeRotator = FRotator(0.f, 270.f, 0.f);
-	UKismetSystemLibrary::MoveComponentTo(GetMesh(), OriginalMeshRelativeLocation, OriginalMeshRelativeRotator, true, true, 1.f, true, EMoveComponentAction::Move, LatentInfo2);
-	
 
+	FVector NewCapsuleLocation = OutHitForWallJump.ImpactPoint;
+	NewCapsuleLocation.Z += 96.f; // Capsule Height
+
+	bClimbUp = true;
 
 	FLatentActionInfo LatentInfo;
 	LatentInfo.CallbackTarget = this;
+
+	UKismetSystemLibrary::MoveComponentTo(GetMesh(), OriginalMeshRelativeLocation, OriginalMeshRelativeRotator, true, true, 1.0f, true, EMoveComponentAction::Move, LatentInfo);
+	
 	LatentInfo.ExecutionFunction = "ResetClimb";
 	LatentInfo.UUID = 1;
 	LatentInfo.Linkage = 0;
-	UCapsuleComponent* Capsule = GetCapsuleComponent();
-	UKismetSystemLibrary::MoveComponentTo(Capsule, NewCapsuleLocation, GetActorRotation(), true, true, 1.3f, true, EMoveComponentAction::Move, LatentInfo);
 
+	UKismetSystemLibrary::MoveComponentTo(GetCapsuleComponent(), NewCapsuleLocation, GetActorRotation(), true, true, 1.3f, true, EMoveComponentAction::Move, LatentInfo);
 }
 
 void AGameplayMechanicsCharacter::HangOff()
 {
-	FVector OriginalMeshRelativeLocation = FVector(0.f, 0.f, -90.f);
-	FRotator OriginalMeshRelativeRotator = FRotator(0.f, 270.f, 0.f);
-	FLatentActionInfo LatentInfo2;
-	LatentInfo2.CallbackTarget = this;
-	UKismetSystemLibrary::MoveComponentTo(GetMesh(), OriginalMeshRelativeLocation, OriginalMeshRelativeRotator, true, true, 0.3f, true, EMoveComponentAction::Move, LatentInfo2);
-
 	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Falling);
-
 
 	ResetClimb();
 }
@@ -404,10 +400,10 @@ void AGameplayMechanicsCharacter::ResetClimb()
 {
 	FVector OriginalMeshRelativeLocation = FVector(0.f, 0.f, -90.f);
 	FRotator OriginalMeshRelativeRotator = FRotator(0.f, 270.f, 0.f);
-	//GetMesh()->SetRelativeLocation(OriginalMeshRelativeLocation);
-	FLatentActionInfo LatentInfo2;
-	LatentInfo2.CallbackTarget = this;
-	UKismetSystemLibrary::MoveComponentTo(GetMesh(), OriginalMeshRelativeLocation, OriginalMeshRelativeRotator, true, true, 0.3f, true, EMoveComponentAction::Move, LatentInfo2);
+
+	FLatentActionInfo LatentInfo;
+	LatentInfo.CallbackTarget = this;
+	UKismetSystemLibrary::MoveComponentTo(GetMesh(), OriginalMeshRelativeLocation, OriginalMeshRelativeRotator, true, true, 0.3f, true, EMoveComponentAction::Move, LatentInfo);
 
 
 	if (bClimbUp)
