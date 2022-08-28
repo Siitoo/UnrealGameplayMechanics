@@ -47,6 +47,9 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	void HangOff();
 
+	UFUNCTION(BlueprintCallable)
+	void StartJumpToClimb();
+
 	/** Called for forwards/backward input */
 	void MoveForward(float Value);
 
@@ -108,6 +111,9 @@ private:
 	int NumInteractableObjects;
 	bool bCanJumpToClimb = false;
 	FHitResult OutHitForWallJump;
+
+	FVector WallLocation;
+	FVector WallNormal;
 
 public:
 	UPROPERTY(BlueprintReadOnly)

@@ -282,8 +282,8 @@ void AGameplayMechanicsCharacter::ProcessJump()
 	bool bLineTraceHit = false;
 	UWorld* World = GetWorld();
 
-	FVector WallLocation = OutHitForWallJump.Location;
-	FVector WallNormal = OutHitForWallJump.Normal;
+	WallLocation = OutHitForWallJump.Location;
+	WallNormal = OutHitForWallJump.Normal;
 
 	if (bCanJumpToClimb)
 	{
@@ -305,41 +305,11 @@ void AGameplayMechanicsCharacter::ProcessJump()
 	{
 		DrawDebugLine(World, OutHitForWallJump.ImpactPoint, OutHitForWallJump.ImpactPoint + OutHitForWallJump.ImpactNormal * 50.f, FColor::Cyan, false, 5.f);
 		
-		FVector WallNormalWithOffset = WallNormal * 30.f;
 		float ZLocation = OutHitForWallJump.Location.Z - 80.f;
-		FVector PositionVector = FVector(WallLocation.X + WallNormalWithOffset.X, WallLocation.Y + WallNormalWithOffset.Y, ZLocation);
 
 		if (!bJumpToClimb && ZLocation > 100.f)
 		{
 			bJumpToClimb = true;
-
-			GetCharacterMovement()->StopMovementImmediately();
-			GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Flying);
-
-			FVector WallNormalInvert = WallNormal * -1.0f;
-
-			FRotator Rotation = UKismetMathLibrary::MakeRotFromX(WallNormalInvert);
-
-			//FRotator Rotation = FRotator::ZeroRotator;
-
-			//Try to change for move component to
-			//GetCapsuleComponent()->SetWorldLocation(PositionVector, false, nullptr, ETeleportType::None);
-
-			FLatentActionInfo LatentInfo;
-			LatentInfo.CallbackTarget = this;
-			UCapsuleComponent* Capsule = GetCapsuleComponent();
-			UKismetSystemLibrary::MoveComponentTo(Capsule, PositionVector, Rotation, true, true, 0.3f, true, EMoveComponentAction::Move, LatentInfo);
-
-			//By Default the Mesh position is 0,0,-90
-
-			FVector MeshRelativeLocation = GetMesh()->GetRelativeLocation();
-			//ofsset to mesh for clipping and distance
-			MeshRelativeLocation.X = -28.f;
-			MeshRelativeLocation.Z -= 65.f;//PositionVector.Z / 3.f;
-
-			GetMesh()->SetRelativeLocation(MeshRelativeLocation);
-
-
 		}
 		
 	}
@@ -354,6 +324,41 @@ void AGameplayMechanicsCharacter::ProcessJump()
 			ACharacter::StopJumping();
 		}
 	}
+}
+
+void AGameplayMechanicsCharacter::StartJumpToClimb()
+{
+	float ZLocation = OutHitForWallJump.Location.Z - 80.f;
+	FVector WallNormalWithOffset = WallNormal * 30.f;
+	FVector PositionVector = FVector(WallLocation.X + WallNormalWithOffset.X, WallLocation.Y + WallNormalWithOffset.Y, ZLocation);
+
+	GetCharacterMovement()->StopMovementImmediately();
+	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Flying);
+
+	FVector WallNormalInvert = WallNormal * -1.0f;
+
+	FRotator Rotation = UKismetMathLibrary::MakeRotFromX(WallNormalInvert);
+
+	FLatentActionInfo LatentInfo;
+	LatentInfo.CallbackTarget = this;
+	UCapsuleComponent* Capsule = GetCapsuleComponent();
+	UKismetSystemLibrary::MoveComponentTo(Capsule, PositionVector, Rotation, true, true, 0.3f, true, EMoveComponentAction::Move, LatentInfo);
+
+	//By Default the Mesh position is 0,0,-90
+
+	FVector MeshRelativeLocation = GetMesh()->GetRelativeLocation();
+	//ofsset to mesh for clipping and distance
+	MeshRelativeLocation.X = -28.f;
+	MeshRelativeLocation.Z -= 65.f;//PositionVector.Z / 3.f;
+
+	FRotator OriginalMeshRelativeRotator = FRotator(0.f, 270.f, 0.f);
+
+	FLatentActionInfo LatentInfo2;
+	LatentInfo2.CallbackTarget = this;
+	LatentInfo2.UUID = 1;
+	UKismetSystemLibrary::MoveComponentTo(GetMesh(), MeshRelativeLocation, OriginalMeshRelativeRotator, true, true, 0.6f, true, EMoveComponentAction::Move, LatentInfo2);
+	//GetMesh()->SetRelativeLocation(MeshRelativeLocation);
+
 }
 
 void AGameplayMechanicsCharacter::HangToClimbUp()
@@ -384,7 +389,10 @@ void AGameplayMechanicsCharacter::HangToClimbUp()
 void AGameplayMechanicsCharacter::HangOff()
 {
 	FVector OriginalMeshRelativeLocation = FVector(0.f, 0.f, -90.f);
-	GetMesh()->SetRelativeLocation(OriginalMeshRelativeLocation);
+	FRotator OriginalMeshRelativeRotator = FRotator(0.f, 270.f, 0.f);
+	FLatentActionInfo LatentInfo2;
+	LatentInfo2.CallbackTarget = this;
+	UKismetSystemLibrary::MoveComponentTo(GetMesh(), OriginalMeshRelativeLocation, OriginalMeshRelativeRotator, true, true, 0.3f, true, EMoveComponentAction::Move, LatentInfo2);
 
 	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Falling);
 
@@ -395,7 +403,12 @@ void AGameplayMechanicsCharacter::HangOff()
 void AGameplayMechanicsCharacter::ResetClimb()
 {
 	FVector OriginalMeshRelativeLocation = FVector(0.f, 0.f, -90.f);
-	GetMesh()->SetRelativeLocation(OriginalMeshRelativeLocation);
+	FRotator OriginalMeshRelativeRotator = FRotator(0.f, 270.f, 0.f);
+	//GetMesh()->SetRelativeLocation(OriginalMeshRelativeLocation);
+	FLatentActionInfo LatentInfo2;
+	LatentInfo2.CallbackTarget = this;
+	UKismetSystemLibrary::MoveComponentTo(GetMesh(), OriginalMeshRelativeLocation, OriginalMeshRelativeRotator, true, true, 0.3f, true, EMoveComponentAction::Move, LatentInfo2);
+
 
 	if (bClimbUp)
 	{
