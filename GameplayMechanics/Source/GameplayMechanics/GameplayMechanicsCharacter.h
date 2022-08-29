@@ -99,7 +99,7 @@ public:
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable)
 	void ResetClimb();
 
 	UFUNCTION(BlueprintCallable)
