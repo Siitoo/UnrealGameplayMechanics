@@ -105,6 +105,10 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void ToggleBlockInput();
 
+	void StartDialog(class UUserWidget*);
+
+	void StopDialog(class UUserWidget*);
+
 private:
 
 	bool bStartTriggerInteractions;
@@ -119,6 +123,8 @@ private:
 
 	FVector WallLocation;
 	FVector WallNormal;
+
+	class UUserWidget* UserWidget;
 
 public:
 	UPROPERTY(BlueprintReadOnly)

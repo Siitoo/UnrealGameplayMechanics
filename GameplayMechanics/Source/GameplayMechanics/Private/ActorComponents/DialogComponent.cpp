@@ -2,8 +2,10 @@
 
 #include "ActorComponents/DialogComponent.h"
 #include "AIController.h"
-#include "Components/WidgetComponent.h"
+#include "Blueprint/UserWidget.h"
 #include "Components/BoxComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "../GameplayMechanicsCharacter.h"
 
 // Sets default values for this component's properties
 UDialogComponent::UDialogComponent()
@@ -15,12 +17,21 @@ UDialogComponent::UDialogComponent()
 	// ...
 
 	BoxTrigger = CreateDefaultSubobject<UBoxComponent>(TEXT("TriggerBoxComponent"));
-	BoxTrigger->SetBoxExtent(FVector(50.f, 50.f, 50.f));
-	BoxTrigger->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
+	BoxTrigger->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+	BoxTrigger->SetCollisionResponseToChannel(ECollisionChannel::ECC_WorldDynamic, ECollisionResponse::ECR_Overlap);
+	BoxTrigger->SetCollisionObjectType(ECollisionChannel::ECC_GameTraceChannel1);
+	BoxTrigger->SetBoxExtent(FVector(50.f, 50.f, 64.f));
+	BoxTrigger->SetRelativeLocation(FVector(70.f, 0.f, 0.f));
 
-	AIDialogController = CreateDefaultSubobject<AAIController>(TEXT("Dialog Controller"));
+	
+	//AIDialogController = nullptr;
+	//DialogWidget = nullptr;
 
-	DialogWidget = CreateDefaultSubobject<UWidgetComponent>("Dialog Widget");
+	//AIDialogController = CreateDefaultSubobject<AAIController>(TEXT("Dialog Controller"));
+
+	DialogWidget = CreateDefaultSubobject<UUserWidget>(TEXT("Dialog Widget"));
+
+	bDialogTriggered = false;
 	
 }
 
@@ -28,9 +39,20 @@ UDialogComponent::UDialogComponent()
 void UDialogComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	FAttachmentTransformRules TransformRules(EAttachmentRule::KeepRelative, false);
+	BoxTrigger->AttachToComponent(GetOwner()->GetRootComponent(), TransformRules);
 
-	DialogWidget->SetVisibility(false);
-
+	if (DialogWidget == nullptr)
+	{
+		UE_LOG(LogTemp, Error, TEXT("NO DIALOG WIDGET CLASS SELECTED!"));
+	}
+	else
+	{
+		DialogWidget->SetVisibility(ESlateVisibility::Hidden);
+	
+	}
+	
 	// ...
 }
 
@@ -44,17 +66,38 @@ void UDialogComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 
 bool UDialogComponent::PrepareInteraction()
 {
+	UE_LOG(LogTemp, Warning, TEXT("Preparing Dialog"));
 	return false;
 }
 
 bool UDialogComponent::Interaction()
 {
-	DialogWidget->SetVisibility(true);
+	UWorld* World = GetWorld();
+	DialogWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(World,0);
+	AGameplayMechanicsCharacter* MainPlayer = Cast<AGameplayMechanicsCharacter>(PlayerCharacter);
+	MainPlayer->StartDialog(DialogWidget);
+	bDialogTriggered = true;
+
 	return false;
 }
 
 bool UDialogComponent::CancelInteraction()
 {
+	UE_LOG(LogTemp, Warning, TEXT("Cancel Dialog"));
+
+	if (bDialogTriggered)
+	{
+		UWorld* World = GetWorld();
+
+		ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(World, 0);
+		AGameplayMechanicsCharacter* MainPlayer = Cast<AGameplayMechanicsCharacter>(PlayerCharacter);
+		MainPlayer->StopDialog(DialogWidget);
+
+		bDialogTriggered = false;
+		DialogWidget->SetVisibility(ESlateVisibility::Hidden);
+	}
+
 	return false;
 }
 

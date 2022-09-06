@@ -31,12 +31,16 @@ public:
 
 public:
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	class AAIController* AIDialogController;
+	//UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AIController")
+	//TSubclassOf<class AAIController> AIDialogController;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	class UWidgetComponent* DialogWidget;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "DialogWidget")
+	class UUserWidget* DialogWidget;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "InteractableBox")
 	class UBoxComponent* BoxTrigger;
+
+private:
+
+	bool bDialogTriggered;
 };

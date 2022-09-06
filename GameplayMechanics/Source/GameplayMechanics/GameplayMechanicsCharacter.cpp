@@ -6,11 +6,15 @@
 #include "Components/BoxComponent.h"
 #include "Components/InputComponent.h"
 #include "Interfaces/InteractionInterface.h"
+#include "ActorComponents/DialogComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Kismet/GameplayStatics.h"
+#include "Components/WidgetComponent.h"
+#include "Blueprint/UserWidget.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AGameplayMechanicsCharacter
@@ -128,6 +132,12 @@ void AGameplayMechanicsCharacter::TriggerInteraction()
 	if (bStartTriggerInteractions)
 	{
 		IInteractionInterface* InteractInterface = Cast<IInteractionInterface>(SelectedInteractableActor);
+
+		if (InteractInterface == nullptr)
+		{
+			InteractInterface = Cast<IInteractionInterface>(SelectedInteractableActor->GetComponentByClass(UDialogComponent::StaticClass()));
+		}
+
 		InteractInterface->Interaction();
 	}
 }
@@ -139,6 +149,12 @@ void AGameplayMechanicsCharacter::OnOverlapBegin(UPrimitiveComponent* Overlapped
 		SelectedInteractableActor = OtherActor;
 		bStartTriggerInteractions = true;
 		IInteractionInterface* InteractInterface = Cast<IInteractionInterface>(OtherActor);
+
+		if (InteractInterface == nullptr)
+		{
+			InteractInterface = Cast<IInteractionInterface>(OtherActor->GetComponentByClass(UDialogComponent::StaticClass()));
+		}
+
 		InteractInterface->PrepareInteraction();
 	}
 
@@ -148,6 +164,12 @@ void AGameplayMechanicsCharacter::OnOverlapBegin(UPrimitiveComponent* Overlapped
 void AGameplayMechanicsCharacter::OnOverlapEnd(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
 	IInteractionInterface* InteractInterface = Cast<IInteractionInterface>(OtherActor);
+
+	if (InteractInterface == nullptr)
+	{
+		InteractInterface = Cast<IInteractionInterface>(OtherActor->GetComponentByClass(UDialogComponent::StaticClass()));
+	}
+
 	InteractInterface->CancelInteraction();
 
 	NumInteractableObjects--;
@@ -413,4 +435,21 @@ void AGameplayMechanicsCharacter::ResetClimb()
 	bJumpToClimb = false;
 	bClimbUp = false;
 	bHangOff = false;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// Dialog
+
+void AGameplayMechanicsCharacter::StartDialog(UUserWidget* Widget)
+{
+	UserWidget = Widget;
+	UserWidget->SetOwningPlayer(UGameplayStatics::GetPlayerController(GetWorld(),0));
+	UserWidget->AddToViewport();
+	
+
+}
+
+void AGameplayMechanicsCharacter::StopDialog(UUserWidget* Widget)
+{
+	UserWidget->RemoveFromViewport();
 }
