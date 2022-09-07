@@ -31,8 +31,14 @@ public:
 
 public:
 
-	//UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AIController")
-	//TSubclassOf<class AAIController> AIDialogController;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AIController")
+	TSubclassOf<class AAIController> AIDialogController;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "BehaviourTree")
+	class UBehaviorTree* BehaviorTree;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Blackboard")
+	class UBlackboardData* Blackboard;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "DialogWidget")
 	class UUserWidget* DialogWidget;
@@ -43,4 +49,7 @@ public:
 private:
 
 	bool bDialogTriggered;
+
+	AAIController* NPCController;
+
 };

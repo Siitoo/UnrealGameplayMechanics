@@ -442,11 +442,14 @@ void AGameplayMechanicsCharacter::ResetClimb()
 
 void AGameplayMechanicsCharacter::StartDialog(UUserWidget* Widget)
 {
+	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+	PlayerController->SetInputMode(FInputModeUIOnly());
+	PlayerController->SetShowMouseCursor(true);
+	
 	UserWidget = Widget;
 	UserWidget->SetOwningPlayer(UGameplayStatics::GetPlayerController(GetWorld(),0));
 	UserWidget->AddToViewport();
 	
-
 }
 
 void AGameplayMechanicsCharacter::StopDialog(UUserWidget* Widget)

@@ -2,6 +2,9 @@
 
 #include "ActorComponents/DialogComponent.h"
 #include "AIController.h"
+#include "BehaviorTree/BehaviorTree.h"
+#include "BehaviorTree/BlackboardData.h"
+#include "BehaviorTree/BlackboardComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/BoxComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -23,11 +26,11 @@ UDialogComponent::UDialogComponent()
 	BoxTrigger->SetBoxExtent(FVector(50.f, 50.f, 64.f));
 	BoxTrigger->SetRelativeLocation(FVector(70.f, 0.f, 0.f));
 
-	
-	//AIDialogController = nullptr;
-	//DialogWidget = nullptr;
-
 	//AIDialogController = CreateDefaultSubobject<AAIController>(TEXT("Dialog Controller"));
+
+	BehaviorTree = CreateDefaultSubobject<UBehaviorTree>(TEXT("BehaviorTree"));
+
+	Blackboard = CreateDefaultSubobject<UBlackboardData>(TEXT("Blackboard"));
 
 	DialogWidget = CreateDefaultSubobject<UUserWidget>(TEXT("Dialog Widget"));
 
@@ -52,7 +55,12 @@ void UDialogComponent::BeginPlay()
 		DialogWidget->SetVisibility(ESlateVisibility::Hidden);
 	
 	}
-	
+	UWorld* World = GetWorld();
+	FActorSpawnParameters SpawnParams;
+	NPCController = Cast<AAIController>(World->SpawnActor(AIDialogController));
+
+	//NPCController = Cast<AAIController>(AIDialogController);
+
 	// ...
 }
 
@@ -72,12 +80,32 @@ bool UDialogComponent::PrepareInteraction()
 
 bool UDialogComponent::Interaction()
 {
-	UWorld* World = GetWorld();
-	DialogWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-	ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(World,0);
-	AGameplayMechanicsCharacter* MainPlayer = Cast<AGameplayMechanicsCharacter>(PlayerCharacter);
-	MainPlayer->StartDialog(DialogWidget);
-	bDialogTriggered = true;
+	if (bDialogTriggered)
+	{
+		int x = 0;
+	}
+	else
+	{
+		UWorld* World = GetWorld();
+		DialogWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(World, 0);
+		AGameplayMechanicsCharacter* MainPlayer = Cast<AGameplayMechanicsCharacter>(PlayerCharacter);
+		MainPlayer->StartDialog(DialogWidget);
+
+		//NPCController = (AAIController*)AIDialogController->GetSuperClass();
+
+		//Creo que es necesario hacer el cast y el usar la blackboard en el begin play
+
+		NPCController->RunBehaviorTree(BehaviorTree);
+
+		UBlackboardComponent* BlackBoardComponent;
+		NPCController->UseBlackboard(Blackboard, BlackBoardComponent);
+
+		BlackBoardComponent->SetValueAsObject(FName("DialogWidget"), DialogWidget);
+
+		bDialogTriggered = true;
+	}
+	
 
 	return false;
 }
