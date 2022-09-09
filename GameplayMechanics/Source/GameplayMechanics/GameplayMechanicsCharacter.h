@@ -106,7 +106,6 @@ public:
 	void ToggleBlockInput();
 
 	void StartDialog(class UUserWidget*);
-
 	void StopDialog(class UUserWidget*);
 
 private:

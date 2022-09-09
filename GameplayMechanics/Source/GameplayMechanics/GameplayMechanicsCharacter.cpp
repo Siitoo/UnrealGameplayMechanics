@@ -195,6 +195,7 @@ void AGameplayMechanicsCharacter::SetupPlayerInputComponent(class UInputComponen
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &AGameplayMechanicsCharacter::ProcessJump);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
 	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AGameplayMechanicsCharacter::TriggerInteraction);
+	
 
 	PlayerInputComponent->BindAxis("Move Forward / Backward", this, &AGameplayMechanicsCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("Move Right / Left", this, &AGameplayMechanicsCharacter::MoveRight);
@@ -443,8 +444,12 @@ void AGameplayMechanicsCharacter::ResetClimb()
 void AGameplayMechanicsCharacter::StartDialog(UUserWidget* Widget)
 {
 	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-	PlayerController->SetInputMode(FInputModeUIOnly());
+
 	PlayerController->SetShowMouseCursor(true);
+
+	InputComponent->ClearActionBindings();
+	InputComponent->AxisBindings.Reset(0);
+	InputComponent->BindAction("Interact", IE_Pressed, this, &AGameplayMechanicsCharacter::TriggerInteraction);
 	
 	UserWidget = Widget;
 	UserWidget->SetOwningPlayer(UGameplayStatics::GetPlayerController(GetWorld(),0));
@@ -454,5 +459,14 @@ void AGameplayMechanicsCharacter::StartDialog(UUserWidget* Widget)
 
 void AGameplayMechanicsCharacter::StopDialog(UUserWidget* Widget)
 {
+	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+
+	PlayerController->SetShowMouseCursor(false);
+
+	InputComponent->RemoveActionBindingForHandle(InputComponent->GetNumActionBindings());
+	SetupPlayerInputComponent(InputComponent);
+
 	UserWidget->RemoveFromViewport();
+
+	UserWidget = nullptr;
 }

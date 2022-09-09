@@ -80,40 +80,37 @@ bool UDialogComponent::PrepareInteraction()
 
 bool UDialogComponent::Interaction()
 {
+	UWorld* World = GetWorld();
+	DialogWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(World, 0);
+	AGameplayMechanicsCharacter* MainPlayer = Cast<AGameplayMechanicsCharacter>(PlayerCharacter);
+
 	if (bDialogTriggered)
 	{
-		int x = 0;
+		UFunction* Func = DialogWidget->GetClass()->FindFunctionByName(FName("NextDialog"));
+
+		if (Func != nullptr)
+		{
+			DialogWidget->ProcessEvent(Func, nullptr);
+		}
 	}
 	else
 	{
-		UWorld* World = GetWorld();
-		DialogWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-		ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(World, 0);
-		AGameplayMechanicsCharacter* MainPlayer = Cast<AGameplayMechanicsCharacter>(PlayerCharacter);
 		MainPlayer->StartDialog(DialogWidget);
-
-		//NPCController = (AAIController*)AIDialogController->GetSuperClass();
-
-		//Creo que es necesario hacer el cast y el usar la blackboard en el begin play
-
 		NPCController->RunBehaviorTree(BehaviorTree);
 
 		UBlackboardComponent* BlackBoardComponent;
 		NPCController->UseBlackboard(Blackboard, BlackBoardComponent);
-
+		
 		BlackBoardComponent->SetValueAsObject(FName("DialogWidget"), DialogWidget);
-
+		
 		bDialogTriggered = true;
 	}
-	
-
 	return false;
 }
 
 bool UDialogComponent::CancelInteraction()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Cancel Dialog"));
-
 	if (bDialogTriggered)
 	{
 		UWorld* World = GetWorld();
@@ -125,7 +122,6 @@ bool UDialogComponent::CancelInteraction()
 		bDialogTriggered = false;
 		DialogWidget->SetVisibility(ESlateVisibility::Hidden);
 	}
-
 	return false;
 }
 

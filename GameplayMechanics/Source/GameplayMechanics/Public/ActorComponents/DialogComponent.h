@@ -27,6 +27,8 @@ public:
 
 	bool PrepareInteraction() override;
 	bool Interaction() override;
+
+	UFUNCTION(BlueprintCallable)
 	bool CancelInteraction() override;
 
 public:
