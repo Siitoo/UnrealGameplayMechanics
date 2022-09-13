@@ -338,9 +338,8 @@ void AGameplayMechanicsCharacter::ProcessJump()
 	//offset for hitted object that are small
 	float ZLocation = OutHitForWallJump.Location.Z - GetActorLocation().Z;
 
-	if (bLineTraceHit && ZLocation > 60.f)
+	if (bLineTraceHit && ZLocation > 60.f && !GetCharacterMovement()->IsFalling())
 	{	
-		UE_LOG(LogTemp, Warning, TEXT("%s"), *FString::SanitizeFloat(ZLocation));
 		if (!bJumpToClimb)
 		{
 			ToggleBlockInput();
