@@ -462,8 +462,9 @@ void AGameplayMechanicsCharacter::StopDialog(UUserWidget* Widget)
 	APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
 
 	PlayerController->SetShowMouseCursor(false);
+	InputComponent->AxisBindings.Reset(0);
+	PlayerController->SetInputMode(FInputModeGameOnly());
 
-	InputComponent->RemoveActionBindingForHandle(InputComponent->GetNumActionBindings());
 	SetupPlayerInputComponent(InputComponent);
 
 	UserWidget->RemoveFromViewport();
