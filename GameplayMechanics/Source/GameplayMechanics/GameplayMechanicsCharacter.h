@@ -4,10 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Interfaces/ProgressBarInterface.h"
 #include "GameplayMechanicsCharacter.generated.h"
 
 UCLASS(config=Game)
-class AGameplayMechanicsCharacter : public ACharacter
+class AGameplayMechanicsCharacter : public ACharacter, public IProgressBarInterface
 {
 	GENERATED_BODY()
 
@@ -36,6 +37,8 @@ public:
 	float MaxHeightToJump;
 
 protected:
+
+	virtual void BeginPlay() override;
 
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -108,6 +111,16 @@ public:
 	void StartDialog(class UUserWidget*);
 	void StopDialog(class UUserWidget*);
 
+	UFUNCTION(BlueprintCallable)
+	virtual float GetCurrentHealth() override;
+	UFUNCTION(BlueprintCallable)
+	virtual float GetHealthAsRatio() override;
+
+	UFUNCTION(BlueprintCallable)
+	virtual float GetCurrentMana() override;
+	UFUNCTION(BlueprintCallable)
+	virtual float GetManaAsRatio() override;
+
 private:
 
 	bool bStartTriggerInteractions;
@@ -134,5 +147,12 @@ public:
 
 	UPROPERTY(BlueprintReadOnly)
 	bool bHangOff;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float MaxPlayerHealth;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float ActualPlayerHealth;
+
 };
 

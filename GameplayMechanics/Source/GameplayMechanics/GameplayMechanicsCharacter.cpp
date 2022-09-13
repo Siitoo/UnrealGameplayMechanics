@@ -79,8 +79,16 @@ AGameplayMechanicsCharacter::AGameplayMechanicsCharacter()
 	bClimbUp = false;
 	bHangOff = false;
 
+	MaxPlayerHealth = 5000.f;
+
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+}
+
+void AGameplayMechanicsCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	ActualPlayerHealth = MaxPlayerHealth;
 }
 
 void AGameplayMechanicsCharacter::Tick(float DeltaTime)
@@ -469,4 +477,26 @@ void AGameplayMechanicsCharacter::StopDialog(UUserWidget* Widget)
 	UserWidget->RemoveFromViewport();
 
 	UserWidget = nullptr;
+}
+
+// Health and Mana progress bar
+
+float AGameplayMechanicsCharacter::GetCurrentHealth()
+{
+	return ActualPlayerHealth;
+}
+
+float AGameplayMechanicsCharacter::GetHealthAsRatio()
+{
+	return ActualPlayerHealth/MaxPlayerHealth;
+}
+
+float AGameplayMechanicsCharacter::GetCurrentMana()
+{
+	return 0.0f;
+}
+
+float AGameplayMechanicsCharacter::GetManaAsRatio()
+{
+	return 0.0f;
 }
