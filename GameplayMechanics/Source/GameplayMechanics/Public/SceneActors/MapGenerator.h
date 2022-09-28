@@ -6,6 +6,44 @@
 #include "GameFramework/Actor.h"
 #include "MapGenerator.generated.h"
 
+USTRUCT()
+struct FGeneratedTriangle
+{
+	GENERATED_BODY()
+
+	FGeneratedTriangle(){ };
+	FGeneratedTriangle(FVector2D v1, FVector2D v2, FVector2D v3)
+	{
+		Vertex1 = v1;
+		Vertex2 = v2;
+		Vertex3 = v3;
+	};
+
+	bool CircumCircleContains(const FVector2D v) const;
+
+public:
+	FVector2D Vertex1, Vertex2, Vertex3;
+	bool bIsBad = false;
+};
+
+USTRUCT()
+struct FGeneratedEdge
+{
+	GENERATED_BODY()
+
+	FGeneratedEdge() { };
+	FGeneratedEdge(FVector2D v1, FVector2D v2)
+	{
+		StartPoint = v1;
+		EndPoint = v2;
+	};
+
+public:
+	FVector2D StartPoint, EndPoint;
+	bool bIsBad = false;
+	
+};
+
 UCLASS()
 class GAMEPLAYMECHANICS_API AMapGenerator : public AActor
 {
@@ -21,15 +59,16 @@ protected:
 	
 private:
 
-	void PoisonDiskSamplingAlgorithm();
-	bool IsCandidateValid(FVector2D Candidate, FVector2D SampleRegionSize, float CellSize, TArray<int> Grid);
-
 	void MyPoisonDiskSamplingAlgorithm();
 	bool IsMyCandidateValid(FVector2D Candidate, FVector2D SampleRegionSize, float CellSize, TArray<int> Grid);
+
+	void DelaunaryTriangulation();
 
 	void DrawDebugStartEndPoints();
 	void DrawDebugGrid();
 	void DrawDebugPoisonDisk();
+	void DrawDebugDelaunary();
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -59,5 +98,10 @@ public:
 	TArray<FVector2D> GeneratedPoints;
 
 	TArray<int> Grid;
+
+	FGeneratedTriangle SuperTriangle;
+	TArray<FGeneratedTriangle> Triangles;
+
+	TArray<FGeneratedEdge> Edges;
 };
 
