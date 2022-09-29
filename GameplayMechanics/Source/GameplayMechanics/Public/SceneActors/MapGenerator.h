@@ -44,6 +44,20 @@ public:
 	
 };
 
+USTRUCT()
+struct FPath
+{
+	GENERATED_BODY()
+
+	FPath() { };
+
+
+public:
+	FVector2D Position;
+	TArray<FVector2D> LinkedPositions;
+
+};
+
 UCLASS()
 class GAMEPLAYMECHANICS_API AMapGenerator : public AActor
 {
@@ -64,10 +78,13 @@ private:
 
 	void DelaunaryTriangulation();
 
+	void GeneratePaths();
+
 	void DrawDebugStartEndPoints();
 	void DrawDebugGrid();
 	void DrawDebugPoisonDisk();
 	void DrawDebugDelaunary();
+	void DrawDebugPathGenerated();
 
 public:	
 	// Called every frame
@@ -103,5 +120,8 @@ public:
 	TArray<FGeneratedTriangle> Triangles;
 
 	TArray<FGeneratedEdge> Edges;
+
+	TArray<FPath> Paths;
+	FRandomStream Random;
 };
 

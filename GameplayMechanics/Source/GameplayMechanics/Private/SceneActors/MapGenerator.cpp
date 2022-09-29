@@ -23,8 +23,13 @@ AMapGenerator::AMapGenerator()
 void AMapGenerator::BeginPlay()
 {
 	Super::BeginPlay();
+
+	Random = FRandomStream(Seed);
+
 	MyPoisonDiskSamplingAlgorithm();
 	DelaunaryTriangulation();
+	GeneratePaths();
+	DrawDebugPathGenerated();
 }
 
 bool AMapGenerator::IsMyCandidateValid(FVector2D Candidate, FVector2D RegionSize, float CellSize, TArray<int> GridCells)
@@ -46,6 +51,12 @@ bool AMapGenerator::IsMyCandidateValid(FVector2D Candidate, FVector2D RegionSize
 			for (int Y = SearchStartY; Y <= SearchEndY; ++Y)
 			{
 				int Index = ceil(RegionSize.X/CellSize) * X + Y;
+
+				if (Index >= GridCells.Num())
+				{
+					return false;
+				}
+
 				int PointIndex = GridCells[Index] - 1;
 
 				if (PointIndex != -1)
@@ -70,13 +81,11 @@ bool AMapGenerator::IsMyCandidateValid(FVector2D Candidate, FVector2D RegionSize
 	return false;
 }
 
-
 void AMapGenerator::MyPoisonDiskSamplingAlgorithm()
 {
 	GeneratedPoints.Reset(0);
 	Grid.Reset(0);
 
-	FRandomStream Random = FRandomStream(Seed);
 	float PISimplified = 3.141592654f;
 
 	FVector2D RegionSize = FVector2D(EndPoint.X - StartPoint.X, HalfGridWeight * 2.f);
@@ -91,7 +100,7 @@ void AMapGenerator::MyPoisonDiskSamplingAlgorithm()
 	TArray<FVector2D> SpawnPoints;
 
 	//StartedPoint, we try with the middle point
-	FVector2D StartedPoint = RegionSize / 2.0f;
+	FVector2D StartedPoint = FVector2D(MaxGridCellsX / 2.0f, MaxGridCellsY/2.0f);
 	SpawnPoints.Add(StartedPoint);
 
 	while (SpawnPoints.Num() > 0 && Iterations > 0)
@@ -134,6 +143,12 @@ void AMapGenerator::MyPoisonDiskSamplingAlgorithm()
 	{
 		SpawnPoints.RemoveAt(0);
 	}
+
+	StartedPoint = FVector2D(StartPoint.X - HalfGridWeight/4.0f, StartPoint.Y + HalfGridWeight);
+	GeneratedPoints.Add(StartedPoint);
+
+	StartedPoint = FVector2D(EndPoint.X - 2.0f * HalfGridWeight, EndPoint.Y + HalfGridWeight);
+	GeneratedPoints.Add(StartedPoint);
 
 	for (int Index = 0; Index < SpawnPoints.Num() - 2; ++Index)
 	{
@@ -285,6 +300,76 @@ void AMapGenerator::DelaunaryTriangulation()
 	}
 }
 
+void AMapGenerator::GeneratePaths()
+{
+	FVector2D StartedPoint = FVector2D(StartPoint.X - HalfGridWeight / 4.0f, StartPoint.Y + HalfGridWeight);
+	FVector2D GoalPoint = FVector2D(EndPoint.X - 2.0f * HalfGridWeight, EndPoint.Y + HalfGridWeight);
+
+	TArray<FVector2D> LinkedPositions;
+
+	FPath StartingPointPath;
+	StartingPointPath.Position = StartedPoint;
+
+	for (int Index = 0; Index < Edges.Num(); ++Index)
+	{
+		if (Edges[Index].StartPoint == StartedPoint)
+		{
+			LinkedPositions.Add(Edges[Index].EndPoint);
+		}
+		else if (Edges[Index].EndPoint == StartedPoint)
+		{
+			LinkedPositions.Add(Edges[Index].StartPoint);
+		}
+	}
+
+	StartingPointPath.LinkedPositions = LinkedPositions;
+	Paths.Add(StartingPointPath);
+
+	for (int Index = 0; Index < Paths.Num(); ++Index)
+	{
+		for (int NextPointIndex = 0; NextPointIndex < Paths[Index].LinkedPositions.Num(); ++NextPointIndex)
+		{
+			FVector2D NexValidPosition = Paths[Index].LinkedPositions[NextPointIndex];
+
+			//Search is it actual tracked.
+			bool bIsTracked = false;
+			int TrackedIndex;
+			for (TrackedIndex = 0; TrackedIndex < Paths.Num(); ++TrackedIndex)
+			{
+				if (Paths[TrackedIndex].Position.Equals(NexValidPosition))
+				{
+					bIsTracked = true;
+					break;
+				}
+			}
+
+			if (!bIsTracked)
+			{
+				FPath PointPath;
+				PointPath.Position = NexValidPosition;
+
+				LinkedPositions.Empty();
+
+				for (int EdgeIndex = 0; EdgeIndex < Edges.Num(); ++EdgeIndex)
+				{
+					if (Edges[EdgeIndex].StartPoint == NexValidPosition && (Edges[EdgeIndex].EndPoint.X - NexValidPosition.X) > SphereRadius/3.0f)
+					{
+						LinkedPositions.Add(Edges[EdgeIndex].EndPoint);
+					}
+					else if (Edges[EdgeIndex].EndPoint == NexValidPosition && (Edges[EdgeIndex].StartPoint.X - NexValidPosition.X) > SphereRadius/3.0f)
+					{
+						LinkedPositions.Add(Edges[EdgeIndex].StartPoint);
+					}
+				}
+
+				PointPath.LinkedPositions = LinkedPositions;
+				Paths.Add(PointPath);
+
+			}
+		}
+	}
+}
+
 void AMapGenerator::DrawDebugStartEndPoints()
 {
 	UWorld* World = GetWorld();
@@ -397,14 +482,43 @@ void AMapGenerator::DrawDebugDelaunary()
 	}
 }
 
+void AMapGenerator::DrawDebugPathGenerated()
+{
+	UWorld* World = GetWorld();
+
+
+	for (int Index = 0; Index < Paths.Num(); ++Index)
+	{
+		int ColorValueR = Random.RandRange(0, 255);
+		int ColorValueG = Random.RandRange(0, 255);
+		int ColorValueB = Random.RandRange(0, 255);
+
+		FColor RandomColor = FColor(ColorValueR, ColorValueG, ColorValueB);
+
+		FVector PathPoint = FVector(Paths[Index].Position.X, Paths[Index].Position.Y, 0.0f);
+
+		DrawDebugSphere(World, PathPoint, 0.1f, 10, RandomColor, true);
+
+		for (int LinkedIndex = 0; LinkedIndex < Paths[Index].LinkedPositions.Num(); ++LinkedIndex)
+		{
+			FVector NexPathPoint = FVector(Paths[Index].LinkedPositions[LinkedIndex].X, Paths[Index].LinkedPositions[LinkedIndex].Y, 0.0f);
+
+			DrawDebugLine(World, PathPoint, NexPathPoint, RandomColor, true);
+		}
+
+	}
+
+
+}
+
 
 // Called every frame
 void AMapGenerator::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	DrawDebugPoisonDisk();
-	DrawDebugDelaunary();
+	//DrawDebugPoisonDisk();
+	//DrawDebugDelaunary();
 }
 
 //https://github.com/bl4ckb0ne/delaunay-triangulation/tree/master/dt
