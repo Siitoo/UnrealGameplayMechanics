@@ -3,6 +3,7 @@
 #include "SceneActors/MapGenerator.h"
 #include "DrawDebugHelpers.h"
 #include "GenericPlatform/GenericPlatformMath.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 // Sets default values
 AMapGenerator::AMapGenerator()
@@ -10,13 +11,22 @@ AMapGenerator::AMapGenerator()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	StartPoint = FVector(0.0f);
-	EndPoint = FVector(50.0f, 0.0f, 0.0f);
-	HalfGridWeight = 25.f;
-	SphereRadius = 5.0f;
-	NumSampleBeforeRejection = 1;
+	//StartPoint = FVector(0.0f);
+	//EndPoint = FVector(50.0f, 0.0f, 0.0f);
+
 	Seed = 123456789;
+	GridExtend = 50.0f;
+	SphereRadius = 5.0f;
 	Iterations = 50000;
+	NumSampleBeforeRejection = 1;
+	bCheckWellGenerated = false;
+
+	
+	bDebugGrid = true;
+	bDebugPoisonDisk = false;
+	bDebugDelaunary = false;
+	
+	PathfindingIterations = 1;
 }
 
 // Called when the game starts or when spawned
@@ -24,12 +34,106 @@ void AMapGenerator::BeginPlay()
 {
 	Super::BeginPlay();
 
+	
+
+	//MyPoisonDiskSamplingAlgorithm();
+	
+	//DelaunaryTriangulation();
+	//GeneratePaths();
+	//DrawDebugPathGenerated();
+}
+
+void AMapGenerator::MyPoisonDiskSamplingAlgorithm()
+{
 	Random = FRandomStream(Seed);
 
-	MyPoisonDiskSamplingAlgorithm();
-	DelaunaryTriangulation();
-	GeneratePaths();
-	DrawDebugPathGenerated();
+	const float PISimplified = 3.141592654f;
+
+	const FVector2D RegionSize = FVector2D(GridExtend, GridExtend);
+	const float CellSize = SphereRadius / FMath::Sqrt(2.0f);
+	const int MaxGridCellsX = ceil(GridExtend / CellSize);
+	const int MaxGridCellsY = MaxGridCellsX;
+	const int GridSize = MaxGridCellsX * MaxGridCellsY;
+
+	GeneratedPoints.Reset(0);
+	Grid.Reset(0);
+	Grid.SetNumZeroed(GridSize);
+
+	TArray<FVector2D> SpawnPoints;
+
+	//StartedPoint, we try with the middle point
+	FVector2D StartedPoint = FVector2D(GridExtend / 2.0f, GridExtend / 2.0f);
+	SpawnPoints.Add(StartedPoint);
+
+	if (Iterations < 0 || Iterations >= MAX_int32)
+	{
+		Iterations = MAX_int32;
+	}
+
+	while (SpawnPoints.Num() > 0 && Iterations > 0)
+	{
+		const int RandomSpawnIndex = Random.RandRange(0, SpawnPoints.Num() - 1);
+		const FVector2D SpawnRandomPoint = SpawnPoints[RandomSpawnIndex];
+
+		if (Iterations == 1)
+		{
+			int x = 1;
+		}
+
+		bool bCandidateAccepted = false;
+
+		for (int Index = 0; Index < NumSampleBeforeRejection; ++Index)
+		{
+			const float Angle = Random.FRand() * PISimplified * 2;
+			const FVector2D Direction = FVector2D(FMath::Sin(Angle), FMath::Cos(Angle));
+			const FVector2D CandidatePoint = SpawnRandomPoint + Direction * Random.RandRange(SphereRadius, SphereRadius * 2.0f);
+
+			if (IsMyCandidateValid(CandidatePoint, RegionSize, CellSize, Grid))
+			{
+				GeneratedPoints.Add(CandidatePoint);
+				SpawnPoints.Add(CandidatePoint);
+
+				const int LocationX = (int)(CandidatePoint.X / CellSize);
+				const int LocationY = (int)(CandidatePoint.Y / CellSize);
+
+				const int GridIndex = MaxGridCellsX * LocationX + LocationY;
+				Grid[GridIndex] = GeneratedPoints.Num();
+				bCandidateAccepted = true;
+				break;
+			}
+
+		}
+
+		if (!bCandidateAccepted)
+		{
+			SpawnPoints.RemoveAt(RandomSpawnIndex);
+		}
+		Iterations -= 1;
+	}
+
+	StartPoint = FVector2D(-10.0f, GridExtend/2.0f);
+	EndPoint = FVector2D(GridExtend + 10.0f, GridExtend / 2.0f);
+
+	GeneratedPoints.Add(StartPoint);
+	GeneratedPoints.Add(EndPoint);
+
+	for (int Index = 0; Index < SpawnPoints.Num() - 2; ++Index)
+	{
+		FVector2D Pos = SpawnPoints[Index];
+
+		for (int NextIndex = Index + 1; NextIndex < SpawnPoints.Num(); ++NextIndex)
+		{
+			FVector2D NextPos = SpawnPoints[NextIndex];
+
+			FVector2D Dist = NextPos - Pos;
+			float SqrtDistance = Dist.SizeSquared();
+
+			if (SqrtDistance < SphereRadius * SphereRadius)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Bad Disck Noise Sample"));
+			}
+		}
+	}
 }
 
 bool AMapGenerator::IsMyCandidateValid(FVector2D Candidate, FVector2D RegionSize, float CellSize, TArray<int> GridCells)
@@ -41,7 +145,7 @@ bool AMapGenerator::IsMyCandidateValid(FVector2D Candidate, FVector2D RegionSize
 
 		//To search 5 by 5 around the cell
 		int SearchStartX = FMath::Max(0, LocationX - 2);
-		int SearchEndX = FMath::Min(LocationX + 2, RegionSize.X/ CellSize);
+		int SearchEndX = FMath::Min(LocationX + 2, RegionSize.X / CellSize);
 
 		int SearchStartY = FMath::Max(0, LocationY - 2);
 		int SearchEndY = FMath::Min(LocationY + 2, RegionSize.Y/ CellSize);
@@ -81,101 +185,15 @@ bool AMapGenerator::IsMyCandidateValid(FVector2D Candidate, FVector2D RegionSize
 	return false;
 }
 
-void AMapGenerator::MyPoisonDiskSamplingAlgorithm()
-{
-	GeneratedPoints.Reset(0);
-	Grid.Reset(0);
-
-	float PISimplified = 3.141592654f;
-
-	FVector2D RegionSize = FVector2D(EndPoint.X - StartPoint.X, HalfGridWeight * 2.f);
-	float CellSize = SphereRadius / FMath::Sqrt(2.0f);
-	int MaxGridCellsX = ceil(RegionSize.X/CellSize);
-	int MaxGridCellsY = ceil(RegionSize.Y/CellSize);
-	int GridSize = MaxGridCellsX * MaxGridCellsY;
-
-	
-	Grid.SetNumZeroed(GridSize);
-
-	TArray<FVector2D> SpawnPoints;
-
-	//StartedPoint, we try with the middle point
-	FVector2D StartedPoint = FVector2D(MaxGridCellsX / 2.0f, MaxGridCellsY/2.0f);
-	SpawnPoints.Add(StartedPoint);
-
-	while (SpawnPoints.Num() > 0 && Iterations > 0)
-	{
-		int RandomSpawnIndex = Random.RandRange(0, SpawnPoints.Num() - 1);
-		FVector2D SpawnRandomPoint = SpawnPoints[RandomSpawnIndex];
-
-		bool bCandidateAccepted = false;
-
-		for (int Index = 0; Index < NumSampleBeforeRejection; ++Index)
-		{
-			float Angle = Random.FRand() * PISimplified * 2;
-			FVector2D Direction = FVector2D(FMath::Sin(Angle), FMath::Cos(Angle));
-			FVector2D CandidatePoint = SpawnRandomPoint + Direction * Random.RandRange(SphereRadius, SphereRadius * 2.0f);
-
-			if (IsMyCandidateValid(CandidatePoint, RegionSize, CellSize, Grid))
-			{
-				GeneratedPoints.Add(CandidatePoint);
-				SpawnPoints.Add(CandidatePoint);
-
-				int LocationX = (int)(CandidatePoint.X / CellSize);
-				int LocationY = (int)(CandidatePoint.Y / CellSize);
-
-				int GridIndex = MaxGridCellsX * LocationX + LocationY;
-				Grid[GridIndex] = GeneratedPoints.Num();
-				bCandidateAccepted = true;
-				break;
-			}
-
-		}
-
-		if (!bCandidateAccepted)
-		{
-			SpawnPoints.RemoveAt(RandomSpawnIndex);
-		}
-		Iterations -= 1;
-	}
-
-	if (!SpawnPoints.IsEmpty() && SpawnPoints[0] == StartedPoint)
-	{
-		SpawnPoints.RemoveAt(0);
-	}
-
-	StartedPoint = FVector2D(StartPoint.X - HalfGridWeight/4.0f, StartPoint.Y + HalfGridWeight);
-	GeneratedPoints.Add(StartedPoint);
-
-	StartedPoint = FVector2D(EndPoint.X - 2.0f * HalfGridWeight, EndPoint.Y + HalfGridWeight);
-	GeneratedPoints.Add(StartedPoint);
-
-	for (int Index = 0; Index < SpawnPoints.Num() - 2; ++Index)
-	{
-		FVector2D Pos = SpawnPoints[Index];
-
-		for (int NextIndex = Index + 1; NextIndex < SpawnPoints.Num(); ++NextIndex)
-		{
-			FVector2D NextPos = SpawnPoints[NextIndex];
-
-			FVector2D Dist = NextPos - Pos;
-			float SqrtDistance = Dist.SizeSquared();
-
-			if (SqrtDistance < SphereRadius * SphereRadius)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("Bad Disck Noise Sample"));
-			}
-		}
-	}
-}
-
 void AMapGenerator::DelaunaryTriangulation()
 {
 	if (GeneratedPoints.Num() > 0)
 	{
+		Triangles.Reset(0);
+		Edges.Reset(0);
+
 		FVector2D MinVertices = GeneratedPoints[0];
 		FVector2D MaxVertices = MinVertices;
-
 
 		//Generating the Super Triangle
 		FVector2D Vertice;
@@ -197,11 +215,11 @@ void AMapGenerator::DelaunaryTriangulation()
 		const float MidX = (MaxVertices.X + MinVertices.X) / 2.0f;
 		const float MidY = (MaxVertices.Y + MinVertices.Y) / 2.0f;
 
-		const FVector2D LeftVertex = FVector2D(MidX - 50.0f * DeltaMax, MidY - DeltaMax);
-		const FVector2D RightVertex = FVector2D(MidX + 50.0f * DeltaMax, MidY - DeltaMax);
-		const FVector2D UpVertex = FVector2D(MidX, MidY + 50.0f * DeltaMax);
+		FVector2D LeftVertex = FVector2D(MidX - 50.0f * DeltaMax, MidY - DeltaMax);
+		FVector2D RightVertex = FVector2D(MidX + 50.0f * DeltaMax, MidY - DeltaMax);
+		FVector2D UpVertex = FVector2D(MidX, MidY + 50.0f * DeltaMax);
 
-		SuperTriangle = FGeneratedTriangle(LeftVertex, RightVertex, UpVertex);
+		FGeneratedTriangle SuperTriangle = FGeneratedTriangle(LeftVertex, RightVertex, UpVertex);
 		
 		Triangles.Add(SuperTriangle);
 
@@ -302,41 +320,39 @@ void AMapGenerator::DelaunaryTriangulation()
 
 void AMapGenerator::GeneratePaths()
 {
-	FVector2D StartedPoint = FVector2D(StartPoint.X - HalfGridWeight / 4.0f, StartPoint.Y + HalfGridWeight);
-	FVector2D GoalPoint = FVector2D(EndPoint.X - 2.0f * HalfGridWeight, EndPoint.Y + HalfGridWeight);
 
 	TArray<FVector2D> LinkedPositions;
 
-	FPath StartingPointPath;
-	StartingPointPath.Position = StartedPoint;
+	FGeneratedNode StartingPointPath;
+	StartingPointPath.NodePosition = StartPoint;
 
 	for (int Index = 0; Index < Edges.Num(); ++Index)
 	{
-		if (Edges[Index].StartPoint == StartedPoint)
+		if (Edges[Index].StartPoint == StartPoint)
 		{
 			LinkedPositions.Add(Edges[Index].EndPoint);
 		}
-		else if (Edges[Index].EndPoint == StartedPoint)
+		else if (Edges[Index].EndPoint == StartPoint)
 		{
 			LinkedPositions.Add(Edges[Index].StartPoint);
 		}
 	}
 
-	StartingPointPath.LinkedPositions = LinkedPositions;
+	StartingPointPath.ChildNodes = LinkedPositions;
 	Paths.Add(StartingPointPath);
 
 	for (int Index = 0; Index < Paths.Num(); ++Index)
 	{
-		for (int NextPointIndex = 0; NextPointIndex < Paths[Index].LinkedPositions.Num(); ++NextPointIndex)
+		for (int NextPointIndex = 0; NextPointIndex < Paths[Index].ChildNodes.Num(); ++NextPointIndex)
 		{
-			FVector2D NexValidPosition = Paths[Index].LinkedPositions[NextPointIndex];
+			FVector2D NexValidPosition = Paths[Index].ChildNodes[NextPointIndex];
 
 			//Search is it actual tracked.
 			bool bIsTracked = false;
 			int TrackedIndex;
 			for (TrackedIndex = 0; TrackedIndex < Paths.Num(); ++TrackedIndex)
 			{
-				if (Paths[TrackedIndex].Position.Equals(NexValidPosition))
+				if (Paths[TrackedIndex].NodePosition.Equals(NexValidPosition))
 				{
 					bIsTracked = true;
 					break;
@@ -345,8 +361,8 @@ void AMapGenerator::GeneratePaths()
 
 			if (!bIsTracked)
 			{
-				FPath PointPath;
-				PointPath.Position = NexValidPosition;
+				FGeneratedNode PointPath;
+				PointPath.NodePosition = NexValidPosition;
 
 				LinkedPositions.Empty();
 
@@ -362,7 +378,7 @@ void AMapGenerator::GeneratePaths()
 					}
 				}
 
-				PointPath.LinkedPositions = LinkedPositions;
+				PointPath.ChildNodes = LinkedPositions;
 				Paths.Add(PointPath);
 
 			}
@@ -370,99 +386,65 @@ void AMapGenerator::GeneratePaths()
 	}
 }
 
+
 void AMapGenerator::DrawDebugStartEndPoints()
 {
 	UWorld* World = GetWorld();
-	DrawDebugSphere(World, StartPoint, 1.0f, 10, FColor::Green);
-	DrawDebugSphere(World, EndPoint, 1.0f, 10, FColor::Blue);
+	//DrawDebugSphere(World, StartPoint, 1.0f, 10, FColor::Green);
+	//DrawDebugSphere(World, EndPoint, 1.0f, 10, FColor::Blue);
 }
 
 void AMapGenerator::DrawDebugGrid()
 {
 	UWorld* World = GetWorld();
-	FVector BoxCenter = EndPoint - StartPoint;
 
-	if (StartPoint.IsZero())
+	const FVector BoxCenter = FVector(GridExtend / 2.0f, GridExtend / 2.0f, 0.1f);
+	const float CellSize = SphereRadius / FMath::Sqrt(2.0f);
+	const int MaxGridCells = ceil(GridExtend / CellSize);
+
+	DrawDebugBox(World, BoxCenter, BoxCenter, FColor::Green);
+
+	FVector Start = FVector::Zero();
+	FVector End = FVector::Zero();
+	End.X = GridExtend;
+
+	for (int Index = 0; Index < MaxGridCells; ++Index)
 	{
-		BoxCenter /= 2.0f;
-	}
-
-	DrawDebugBox(World, BoxCenter, FVector(BoxCenter.X, HalfGridWeight * 2.f, 0.1f), FColor::Green);
-
-	FVector2D RegionSize = FVector2D(EndPoint.X - StartPoint.X, HalfGridWeight * 2.f);
-	float CellSize = SphereRadius / FMath::Sqrt(2.0f);
-	int MaxGridCellsX = ceil(RegionSize.X / CellSize);
-	int MaxGridCellsY = ceil(RegionSize.Y / CellSize);
-
-	for (int Index = 0; Index < MaxGridCellsX; ++Index)
-	{
-		FVector Start = StartPoint;
-		Start.Y = Index*CellSize;
-		FVector End = EndPoint;
+		Start.Y = Index * CellSize;
 		End.Y = Index * CellSize;
+
 		DrawDebugLine(World, Start, End, FColor::Black);
 	}
 
-	for (int Index = 0; Index < MaxGridCellsY; ++Index)
+	Start = FVector::Zero();
+	End = FVector::Zero();
+	End.Y = GridExtend;
+
+	for (int Index = 0; Index < MaxGridCells; ++Index)
 	{
-		FVector Start = FVector(0.0f);
 		Start.X = Index * CellSize;
-		FVector End = FVector(0.0f,RegionSize.Y,0.0f);
 		End.X = Index * CellSize;
+
 		DrawDebugLine(World, Start, End, FColor::Black);
 	}
-
-	for (int X = 0; X < MaxGridCellsX; ++X)
-	{
-		for (int Y = 0; Y < MaxGridCellsY; ++Y)
-		{
-			int GridIndex = MaxGridCellsX * X + Y;
-
-			FColor Color = FColor::Black;
-
-			if (Grid[GridIndex] - 1 != -1)
-			{
-				Color = FColor::Magenta;
-			}
-
-			FVector Position = FVector(X * CellSize + CellSize/2.0f, Y * CellSize + CellSize / 2.0f, 0.0f);
-
-			DrawDebugSphere(World, Position, 0.2, 1.0f, Color);
-		}
-	}
-
 }
 
 void AMapGenerator::DrawDebugPoisonDisk()
 {
-	//DrawDebugGrid();
-	//DrawDebugStartEndPoints();
-	
 	UWorld* World = GetWorld();
 
 	for (int Index = 0; Index < GeneratedPoints.Num(); ++Index)
 	{
-		FVector Position = FVector(GeneratedPoints[Index].X, GeneratedPoints[Index].Y, 0.0f);
-		//DrawDebugSphere(World, Position, SphereRadius, 10, FColor::Red);
-		DrawDebugSphere(World, Position, 0.1, 10, FColor::Blue);
+		const FVector Position = FVector(GeneratedPoints[Index].X, GeneratedPoints[Index].Y, 0.0f);
+		DrawDebugSphere(World, Position, 0.1, 4, FColor::Green);
 	}
-
 }
 
 void AMapGenerator::DrawDebugDelaunary()
 {
 	UWorld* World = GetWorld();
 
-	FVector V1 = FVector(SuperTriangle.Vertex1.X, SuperTriangle.Vertex1.Y,0.0f);
-	FVector V2 = FVector(SuperTriangle.Vertex2.X, SuperTriangle.Vertex2.Y, 0.0f);
-	FVector V3 = FVector(SuperTriangle.Vertex3.X, SuperTriangle.Vertex3.Y, 0.0f);
-
-	//DrawDebugLine(World, V1, V2, FColor::Orange);
-	//DrawDebugLine(World, V2, V3, FColor::Orange);
-	//DrawDebugLine(World, V3, V1, FColor::Orange);
-
-
-	/*for (int Index = 0; Index < Triangles.Num(); ++Index)
+	for (int Index = 0; Index < Triangles.Num(); ++Index)
 	{
 		FVector Vert1 = FVector(Triangles[Index].Vertex1.X, Triangles[Index].Vertex1.Y, 0.0f);
 		FVector Vert2 = FVector(Triangles[Index].Vertex2.X, Triangles[Index].Vertex2.Y, 0.0f);
@@ -471,7 +453,7 @@ void AMapGenerator::DrawDebugDelaunary()
 		DrawDebugLine(World, Vert1, Vert2, FColor::Blue);
 		DrawDebugLine(World, Vert2, Vert3, FColor::Blue);
 		DrawDebugLine(World, Vert3, Vert1, FColor::Blue);
-	}*/
+	}
 
 	for (int Index = 0; Index < Edges.Num(); ++Index)
 	{
@@ -486,6 +468,7 @@ void AMapGenerator::DrawDebugPathGenerated()
 {
 	UWorld* World = GetWorld();
 
+	UKismetSystemLibrary::FlushPersistentDebugLines(World);
 
 	for (int Index = 0; Index < Paths.Num(); ++Index)
 	{
@@ -495,59 +478,47 @@ void AMapGenerator::DrawDebugPathGenerated()
 
 		FColor RandomColor = FColor(ColorValueR, ColorValueG, ColorValueB);
 
-		FVector PathPoint = FVector(Paths[Index].Position.X, Paths[Index].Position.Y, 0.0f);
+		FVector PathPoint = FVector(Paths[Index].NodePosition.X, Paths[Index].NodePosition.Y, 0.0f);
 
 		DrawDebugSphere(World, PathPoint, 0.1f, 10, RandomColor, true);
 
-		for (int LinkedIndex = 0; LinkedIndex < Paths[Index].LinkedPositions.Num(); ++LinkedIndex)
+		for (int LinkedIndex = 0; LinkedIndex < Paths[Index].ChildNodes.Num(); ++LinkedIndex)
 		{
-			FVector NexPathPoint = FVector(Paths[Index].LinkedPositions[LinkedIndex].X, Paths[Index].LinkedPositions[LinkedIndex].Y, 0.0f);
+			FVector NexPathPoint = FVector(Paths[Index].ChildNodes[LinkedIndex].X, Paths[Index].ChildNodes[LinkedIndex].Y, 0.0f);
 
 			DrawDebugLine(World, PathPoint, NexPathPoint, RandomColor, true);
 		}
 
 	}
-
-
 }
-
 
 // Called every frame
 void AMapGenerator::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	//DrawDebugPoisonDisk();
-	//DrawDebugDelaunary();
+	if (bDebugGrid)
+	{
+		DrawDebugGrid();
+	}
+	
+	if (bDebugPoisonDisk)
+	{
+		DrawDebugPoisonDisk();
+	}
+	
+	if (bDebugDelaunary)
+	{
+		DrawDebugDelaunary();
+	}
+
+	if (bDebugGeneratedPath)
+	{
+		DrawDebugPathGenerated();
+		bDebugGeneratedPath = false;
+	}
+
+
 }
 
-//https://github.com/bl4ckb0ne/delaunay-triangulation/tree/master/dt
 
-bool FGeneratedTriangle::CircumCircleContains(const FVector2D Vertex) const
-{
-	const float Ab = Vertex1.SizeSquared();
-	const float Cd = Vertex2.SizeSquared();
-	const float Ef = Vertex3.SizeSquared();
-
-	const float Ax = Vertex1.X;
-	const float Ay = Vertex1.Y;
-	const float Bx = Vertex2.X;
-	const float By = Vertex2.Y;
-	const float Cx = Vertex3.X;
-	const float Cy = Vertex3.Y;
-
-	const float Circum_X = (Ab * (Cy - By) + Cd * (Ay - Cy) + Ef * (By - Ay)) / (Ax * (Cy - By) + Bx * (Ay - Cy) + Cx * (By - Ay));
-	const float Circum_Y = (Ab * (Cx - Bx) + Cd * (Ax - Cx) + Ef * (Bx - Ax)) / (Ay * (Cx - Bx) + By * (Ax - Cx) + Cy * (Bx - Ax));
-
-	const FVector2D Circum = FVector2D(Circum_X/2.0f, Circum_Y/2.0f);
-
-	const float DxV1 = Ax - Circum.X;
-	const float DyV1 = Ay - Circum.Y;
-	const float RaidusCircum = DxV1 * DxV1 + DyV1 * DyV1;
-
-	const float DxVertex = Vertex.X - Circum.X;
-	const float DyVertex = Vertex.Y - Circum.Y;
-	const float Distance = DxVertex * DxVertex + DyVertex * DyVertex;
-
-	return Distance <= RaidusCircum;
-}

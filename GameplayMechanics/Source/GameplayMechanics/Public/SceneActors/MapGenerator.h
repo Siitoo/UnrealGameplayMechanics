@@ -4,9 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Structs/GeneratedEdge.h"
+#include "Structs/GeneratedNode.h"
+#include "Structs/GeneratedTriangles.h"
 #include "MapGenerator.generated.h"
 
-USTRUCT()
+/*USTRUCT()
 struct FGeneratedTriangle
 {
 	GENERATED_BODY()
@@ -24,9 +27,9 @@ struct FGeneratedTriangle
 public:
 	FVector2D Vertex1, Vertex2, Vertex3;
 	bool bIsBad = false;
-};
+};*/
 
-USTRUCT()
+/*USTRUCT()
 struct FGeneratedEdge
 {
 	GENERATED_BODY()
@@ -42,21 +45,7 @@ public:
 	FVector2D StartPoint, EndPoint;
 	bool bIsBad = false;
 	
-};
-
-USTRUCT()
-struct FPath
-{
-	GENERATED_BODY()
-
-	FPath() { };
-
-
-public:
-	FVector2D Position;
-	TArray<FVector2D> LinkedPositions;
-
-};
+};*/
 
 UCLASS()
 class GAMEPLAYMECHANICS_API AMapGenerator : public AActor
@@ -73,55 +62,82 @@ protected:
 	
 private:
 
+	UFUNCTION(BlueprintCallable)
 	void MyPoisonDiskSamplingAlgorithm();
 	bool IsMyCandidateValid(FVector2D Candidate, FVector2D SampleRegionSize, float CellSize, TArray<int> Grid);
-
+	UFUNCTION(BlueprintCallable)
 	void DelaunaryTriangulation();
-
+	UFUNCTION(BlueprintCallable)
 	void GeneratePaths();
 
 	void DrawDebugStartEndPoints();
+	UFUNCTION(BlueprintCallable)
 	void DrawDebugGrid();
+	UFUNCTION(BlueprintCallable)
 	void DrawDebugPoisonDisk();
+	UFUNCTION(BlueprintCallable)
 	void DrawDebugDelaunary();
+
+	UFUNCTION(BlueprintCallable)
 	void DrawDebugPathGenerated();
 
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-
-	UPROPERTY(EditAnywhere)
-	FVector StartPoint;
-
-	UPROPERTY(EditAnywhere)
-	FVector EndPoint;
-
-	UPROPERTY(EditAnywhere)
-	float HalfGridWeight;
-
-	UPROPERTY(EditAnywhere)
-	int NumSampleBeforeRejection;
-
-	UPROPERTY(EditAnywhere)
-	float SphereRadius;
-
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Poison Disk Sampling Grid Generator")
 	int Seed;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Poison Disk Sampling Grid Generator")
+	float GridExtend;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Poison Disk Sampling Grid Generator")
+	float SphereRadius;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Poison Disk Sampling Grid Generator")
 	int Iterations;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Poison Disk Sampling Grid Generator")
+	int NumSampleBeforeRejection;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Poison Disk Sampling Grid Generator")
+	bool bCheckWellGenerated;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug Map Generator")
+	bool bDebugGrid;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug Map Generator")
+	bool bDebugPoisonDisk;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug Map Generator")
+	bool bDebugDelaunary;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug Map Generator")
+	bool bDebugGeneratedPath;
 
 	TArray<FVector2D> GeneratedPoints;
 
 	TArray<int> Grid;
 
-	FGeneratedTriangle SuperTriangle;
+	
 	TArray<FGeneratedTriangle> Triangles;
 
 	TArray<FGeneratedEdge> Edges;
 
-	TArray<FPath> Paths;
+	TArray<FGeneratedNode> Paths;
+
 	FRandomStream Random;
+
+	UPROPERTY(EditAnywhere)
+	int PathfindingIterations;
+
+private:
+
+	UPROPERTY(EditAnywhere)
+	FVector2D StartPoint;
+
+	UPROPERTY(EditAnywhere)
+	FVector2D EndPoint;
+
 };
 
