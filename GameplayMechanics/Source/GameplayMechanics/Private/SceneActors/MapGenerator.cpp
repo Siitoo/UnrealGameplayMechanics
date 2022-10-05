@@ -314,85 +314,77 @@ void AMapGenerator::DelaunaryTriangulation()
 			Edges.Add(FGeneratedEdge(Triangles[TriangleIndex].Vertex2, Triangles[TriangleIndex].Vertex3));
 			Edges.Add(FGeneratedEdge(Triangles[TriangleIndex].Vertex3, Triangles[TriangleIndex].Vertex1));
 		}
-
 	}
+
+
+
 }
 
 void AMapGenerator::GeneratePaths()
 {
+	Paths.Reset(0);
 
-	TArray<FVector2D> LinkedPositions;
-
+	//Pre generate the points on Path
 	FGeneratedNode StartingPointPath;
 	StartingPointPath.NodePosition = StartPoint;
+	Paths.Add(StartingPointPath);
 
-	for (int Index = 0; Index < Edges.Num(); ++Index)
+	for (int Index = 0; Index < GeneratedPoints.Num()-2; ++Index)
 	{
-		if (Edges[Index].StartPoint == StartPoint)
-		{
-			LinkedPositions.Add(Edges[Index].EndPoint);
-		}
-		else if (Edges[Index].EndPoint == StartPoint)
-		{
-			LinkedPositions.Add(Edges[Index].StartPoint);
-		}
+		FGeneratedNode PathNode;
+		PathNode.NodePosition = GeneratedPoints[Index];
+		int PathIndex = Paths.Add(PathNode);
 	}
 
-	StartingPointPath.ChildNodes = LinkedPositions;
-	Paths.Add(StartingPointPath);
+	FGeneratedNode EndPointPath;
+	EndPointPath.NodePosition = EndPoint;
+	Paths.Add(EndPointPath);
+
 
 	for (int Index = 0; Index < Paths.Num(); ++Index)
 	{
-		for (int NextPointIndex = 0; NextPointIndex < Paths[Index].ChildNodes.Num(); ++NextPointIndex)
+		FVector2D* NodePosition = &Paths[Index].NodePosition;
+
+		for (auto EdgeIt = Edges.CreateConstIterator(); EdgeIt; ++EdgeIt)
 		{
-			FVector2D NexValidPosition = Paths[Index].ChildNodes[NextPointIndex];
+			FVector2D EdgePosition = FVector2D(-1.0f);
 
-			//Search is it actual tracked.
-			bool bIsTracked = false;
-			int TrackedIndex;
-			for (TrackedIndex = 0; TrackedIndex < Paths.Num(); ++TrackedIndex)
+			if (EdgeIt->StartPoint.Equals(*NodePosition))
 			{
-				if (Paths[TrackedIndex].NodePosition.Equals(NexValidPosition))
+				EdgePosition = EdgeIt->EndPoint;
+			}
+			else if (EdgeIt->EndPoint.Equals(*NodePosition))
+			{
+				EdgePosition = EdgeIt->StartPoint;
+			}
+
+			if (EdgePosition.X != -1)
+			{
+				if ((EdgePosition.X - NodePosition->X) > SphereRadius / 3.0f)
 				{
-					bIsTracked = true;
-					break;
+					FGeneratedNode* TrackedNode = nullptr;
+					for (auto It = Paths.CreateConstIterator(); It; ++It)
+					{
+						if (It->NodePosition.Equals(EdgePosition))
+						{
+							TrackedNode = &Paths[It.GetIndex()];
+							break;
+						}
+					}
+
+					if (TrackedNode != nullptr)
+					{
+						Paths[Index].ChildNodes.Add(TrackedNode);
+						TrackedNode->ParentNode = &Paths[Index];
+					}
 				}
 			}
 
-			if (!bIsTracked)
-			{
-				FGeneratedNode PointPath;
-				PointPath.NodePosition = NexValidPosition;
-
-				LinkedPositions.Empty();
-
-				for (int EdgeIndex = 0; EdgeIndex < Edges.Num(); ++EdgeIndex)
-				{
-					if (Edges[EdgeIndex].StartPoint == NexValidPosition && (Edges[EdgeIndex].EndPoint.X - NexValidPosition.X) > SphereRadius/3.0f)
-					{
-						LinkedPositions.Add(Edges[EdgeIndex].EndPoint);
-					}
-					else if (Edges[EdgeIndex].EndPoint == NexValidPosition && (Edges[EdgeIndex].StartPoint.X - NexValidPosition.X) > SphereRadius/3.0f)
-					{
-						LinkedPositions.Add(Edges[EdgeIndex].StartPoint);
-					}
-				}
-
-				PointPath.ChildNodes = LinkedPositions;
-				Paths.Add(PointPath);
-
-			}
 		}
+
 	}
 }
 
-
-void AMapGenerator::DrawDebugStartEndPoints()
-{
-	UWorld* World = GetWorld();
-	//DrawDebugSphere(World, StartPoint, 1.0f, 10, FColor::Green);
-	//DrawDebugSphere(World, EndPoint, 1.0f, 10, FColor::Blue);
-}
 
 void AMapGenerator::DrawDebugGrid()
 {
@@ -484,7 +476,7 @@ void AMapGenerator::DrawDebugPathGenerated()
 
 		for (int LinkedIndex = 0; LinkedIndex < Paths[Index].ChildNodes.Num(); ++LinkedIndex)
 		{
-			FVector NexPathPoint = FVector(Paths[Index].ChildNodes[LinkedIndex].X, Paths[Index].ChildNodes[LinkedIndex].Y, 0.0f);
+			FVector NexPathPoint = FVector(Paths[Index].ChildNodes[LinkedIndex]->NodePosition.X, Paths[Index].ChildNodes[LinkedIndex]->NodePosition.Y, 0.0f);
 
 			DrawDebugLine(World, PathPoint, NexPathPoint, RandomColor, true);
 		}

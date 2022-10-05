@@ -17,7 +17,7 @@ struct FGeneratedNode
 
 public:
 	FVector2D NodePosition;
-	TArray<FVector2D> ChildNodes;
+	TArray<FGeneratedNode*> ChildNodes;
 	FGeneratedNode* ParentNode;
 
 };

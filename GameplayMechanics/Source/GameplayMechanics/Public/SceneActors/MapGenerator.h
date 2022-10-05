@@ -70,7 +70,7 @@ private:
 	UFUNCTION(BlueprintCallable)
 	void GeneratePaths();
 
-	void DrawDebugStartEndPoints();
+
 	UFUNCTION(BlueprintCallable)
 	void DrawDebugGrid();
 	UFUNCTION(BlueprintCallable)
