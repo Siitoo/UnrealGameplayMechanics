@@ -9,44 +9,6 @@
 #include "Structs/GeneratedTriangles.h"
 #include "MapGenerator.generated.h"
 
-/*USTRUCT()
-struct FGeneratedTriangle
-{
-	GENERATED_BODY()
-
-	FGeneratedTriangle(){ };
-	FGeneratedTriangle(FVector2D v1, FVector2D v2, FVector2D v3)
-	{
-		Vertex1 = v1;
-		Vertex2 = v2;
-		Vertex3 = v3;
-	};
-
-	bool CircumCircleContains(const FVector2D v) const;
-
-public:
-	FVector2D Vertex1, Vertex2, Vertex3;
-	bool bIsBad = false;
-};*/
-
-/*USTRUCT()
-struct FGeneratedEdge
-{
-	GENERATED_BODY()
-
-	FGeneratedEdge() { };
-	FGeneratedEdge(FVector2D v1, FVector2D v2)
-	{
-		StartPoint = v1;
-		EndPoint = v2;
-	};
-
-public:
-	FVector2D StartPoint, EndPoint;
-	bool bIsBad = false;
-	
-};*/
-
 UCLASS()
 class GAMEPLAYMECHANICS_API AMapGenerator : public AActor
 {
@@ -119,7 +81,6 @@ public:
 
 	TArray<int> Grid;
 
-	
 	TArray<FGeneratedTriangle> Triangles;
 
 	TArray<FGeneratedEdge> Edges;

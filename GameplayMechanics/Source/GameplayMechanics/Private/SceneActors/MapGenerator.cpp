@@ -11,9 +11,6 @@ AMapGenerator::AMapGenerator()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	//StartPoint = FVector(0.0f);
-	//EndPoint = FVector(50.0f, 0.0f, 0.0f);
-
 	Seed = 123456789;
 	GridExtend = 50.0f;
 	SphereRadius = 5.0f;
@@ -21,7 +18,6 @@ AMapGenerator::AMapGenerator()
 	NumSampleBeforeRejection = 1;
 	bCheckWellGenerated = false;
 
-	
 	bDebugGrid = true;
 	bDebugPoisonDisk = false;
 	bDebugDelaunary = false;
@@ -33,14 +29,6 @@ AMapGenerator::AMapGenerator()
 void AMapGenerator::BeginPlay()
 {
 	Super::BeginPlay();
-
-	
-
-	//MyPoisonDiskSamplingAlgorithm();
-	
-	//DelaunaryTriangulation();
-	//GeneratePaths();
-	//DrawDebugPathGenerated();
 }
 
 void AMapGenerator::MyPoisonDiskSamplingAlgorithm()
@@ -315,9 +303,6 @@ void AMapGenerator::DelaunaryTriangulation()
 			Edges.Add(FGeneratedEdge(Triangles[TriangleIndex].Vertex3, Triangles[TriangleIndex].Vertex1));
 		}
 	}
-
-
-
 }
 
 void AMapGenerator::GeneratePaths()
@@ -339,7 +324,6 @@ void AMapGenerator::GeneratePaths()
 	FGeneratedNode EndPointPath;
 	EndPointPath.NodePosition = EndPoint;
 	Paths.Add(EndPointPath);
-
 
 	for (int Index = 0; Index < Paths.Num(); ++Index)
 	{
@@ -379,12 +363,9 @@ void AMapGenerator::GeneratePaths()
 					}
 				}
 			}
-
 		}
-
 	}
 }
-
 
 void AMapGenerator::DrawDebugGrid()
 {
@@ -424,11 +405,12 @@ void AMapGenerator::DrawDebugGrid()
 void AMapGenerator::DrawDebugPoisonDisk()
 {
 	UWorld* World = GetWorld();
+	UKismetSystemLibrary::FlushPersistentDebugLines(World);
 
-	for (int Index = 0; Index < GeneratedPoints.Num(); ++Index)
+	for (auto It = GeneratedPoints.CreateConstIterator(); It; ++It)
 	{
-		const FVector Position = FVector(GeneratedPoints[Index].X, GeneratedPoints[Index].Y, 0.0f);
-		DrawDebugSphere(World, Position, 0.1, 4, FColor::Green);
+		const FVector Position = FVector(It->X, It->Y, 0.0f);
+		DrawDebugSphere(World, Position, 0.1, 4, FColor::Green, true);
 	}
 }
 
@@ -436,23 +418,23 @@ void AMapGenerator::DrawDebugDelaunary()
 {
 	UWorld* World = GetWorld();
 
-	for (int Index = 0; Index < Triangles.Num(); ++Index)
+	for (auto It = Triangles.CreateConstIterator(); It; ++It)
 	{
-		FVector Vert1 = FVector(Triangles[Index].Vertex1.X, Triangles[Index].Vertex1.Y, 0.0f);
-		FVector Vert2 = FVector(Triangles[Index].Vertex2.X, Triangles[Index].Vertex2.Y, 0.0f);
-		FVector Vert3 = FVector(Triangles[Index].Vertex3.X, Triangles[Index].Vertex3.Y, 0.0f);
+		const FVector Vert1 = FVector(It->Vertex1.X, It->Vertex1.Y, 0.0f);
+		const FVector Vert2 = FVector(It->Vertex2.X, It->Vertex2.Y, 0.0f);
+		const FVector Vert3 = FVector(It->Vertex3.X, It->Vertex3.Y, 0.0f);
 
-		DrawDebugLine(World, Vert1, Vert2, FColor::Blue);
-		DrawDebugLine(World, Vert2, Vert3, FColor::Blue);
-		DrawDebugLine(World, Vert3, Vert1, FColor::Blue);
+		DrawDebugLine(World, Vert1, Vert2, FColor::Blue, true);
+		DrawDebugLine(World, Vert2, Vert3, FColor::Blue, true);
+		DrawDebugLine(World, Vert3, Vert1, FColor::Blue, true);
 	}
 
-	for (int Index = 0; Index < Edges.Num(); ++Index)
+	for (auto It = Edges.CreateConstIterator(); It; ++It)
 	{
-		FVector Vert1 = FVector(Edges[Index].StartPoint.X, Edges[Index].StartPoint.Y, 0.0f);
-		FVector Vert2 = FVector(Edges[Index].EndPoint.X, Edges[Index].EndPoint.Y, 0.0f);
+		const FVector Vert1 = FVector(It->StartPoint.X, It->StartPoint.Y, 0.0f);
+		const FVector Vert2 = FVector(It->EndPoint.X, It->EndPoint.Y, 0.0f);
 
-		DrawDebugLine(World, Vert1, Vert2, FColor::Blue);
+		DrawDebugLine(World, Vert1, Vert2, FColor::Blue, true);
 	}
 }
 
@@ -480,7 +462,6 @@ void AMapGenerator::DrawDebugPathGenerated()
 
 			DrawDebugLine(World, PathPoint, NexPathPoint, RandomColor, true);
 		}
-
 	}
 }
 
@@ -497,11 +478,13 @@ void AMapGenerator::Tick(float DeltaTime)
 	if (bDebugPoisonDisk)
 	{
 		DrawDebugPoisonDisk();
+		bDebugPoisonDisk = false;
 	}
 	
 	if (bDebugDelaunary)
 	{
 		DrawDebugDelaunary();
+		bDebugDelaunary = false;
 	}
 
 	if (bDebugGeneratedPath)
@@ -509,8 +492,6 @@ void AMapGenerator::Tick(float DeltaTime)
 		DrawDebugPathGenerated();
 		bDebugGeneratedPath = false;
 	}
-
-
 }
 
 
