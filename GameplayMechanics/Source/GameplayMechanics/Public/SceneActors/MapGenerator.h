@@ -32,6 +32,9 @@ private:
 	UFUNCTION(BlueprintCallable)
 	void GeneratePaths();
 
+	UFUNCTION(BlueprintCallable)
+	void FindRoutes();
+
 
 	UFUNCTION(BlueprintCallable)
 	void DrawDebugGrid();
@@ -86,6 +89,7 @@ public:
 	TArray<FGeneratedEdge> Edges;
 
 	TArray<FGeneratedNode> Paths;
+	TArray<FGeneratedNode> Routes;
 
 	FRandomStream Random;
 

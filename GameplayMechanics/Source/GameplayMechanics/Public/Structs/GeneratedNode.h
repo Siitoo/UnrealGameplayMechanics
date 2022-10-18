@@ -19,5 +19,5 @@ public:
 	FVector2D NodePosition;
 	TArray<FGeneratedNode*> ChildNodes;
 	FGeneratedNode* ParentNode;
-
+	int Score = 0;
 };

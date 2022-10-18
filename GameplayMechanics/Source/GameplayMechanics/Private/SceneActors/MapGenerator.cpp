@@ -318,7 +318,7 @@ void AMapGenerator::GeneratePaths()
 	{
 		FGeneratedNode PathNode;
 		PathNode.NodePosition = GeneratedPoints[Index];
-		int PathIndex = Paths.Add(PathNode);
+		Paths.Add(PathNode);
 	}
 
 	FGeneratedNode EndPointPath;
@@ -358,9 +358,127 @@ void AMapGenerator::GeneratePaths()
 
 					if (TrackedNode != nullptr)
 					{
-						Paths[Index].ChildNodes.Add(TrackedNode);
-						TrackedNode->ParentNode = &Paths[Index];
+						bool bIsAlreadyAChild = false;
+
+						for (int IndexChild = 0; IndexChild < Paths[Index].ChildNodes.Num(); ++IndexChild)
+						{
+							if (TrackedNode->NodePosition.Equals(Paths[Index].ChildNodes[IndexChild]->NodePosition))
+							{
+								bIsAlreadyAChild = true;
+								break;
+							}
+						}
+
+						if (!bIsAlreadyAChild)
+						{
+							Paths[Index].ChildNodes.Add(TrackedNode);	
+							TrackedNode->ParentNode = &Paths[Index];
+						}
+						
 					}
+				}
+			}
+		}
+	}
+
+	FindRoutes();
+}
+
+void AMapGenerator::FindRoutes()
+{
+	Routes.Reset(0);
+	TArray<FGeneratedNode> Open;
+	TArray<FGeneratedNode> Close;
+
+	FGeneratedNode* CurrentOpen = nullptr;
+	FGeneratedNode* CurrentClose = nullptr;
+
+	const FGeneratedNode* Goal = &Paths[Paths.Num() - 1];
+
+	Open.Add(Paths[0]);
+
+	while (Open.Num() > 0)
+	{
+		int MinValue = INT_MAX;
+		int OpenIndex = -1;
+		for (auto It = Open.CreateConstIterator(); It; ++It)
+		{
+			FVector2D DistanceVector = Goal->NodePosition - It->NodePosition;
+			float Distance = DistanceVector.Size() + It->Score;
+
+			if (Distance < MinValue)
+			{
+				MinValue = Distance;
+				OpenIndex = It.GetIndex();
+				CurrentOpen = &Open[OpenIndex];
+			}	
+		}
+
+		if (CurrentOpen != nullptr)
+		{
+			Close.Add(*CurrentOpen);
+			CurrentClose = &Close[Close.Num() - 1];
+			Open.RemoveAt(OpenIndex);
+
+			if (Close[Close.Num() - 1].NodePosition == Goal->NodePosition)
+			{
+				Routes.Reset(0);
+				FGeneratedNode NodeIterator = *CurrentClose;
+
+				while (NodeIterator.ParentNode != nullptr)
+				{
+					Routes.Add(NodeIterator);
+					NodeIterator = *NodeIterator.ParentNode;
+				}
+				
+				NodeIterator.ParentNode = &Paths[0];
+				Routes.Add(Paths[0]);
+				break;
+			}
+
+			for (int Index = 0; Index < CurrentClose->ChildNodes.Num(); ++Index)
+			{
+				FGeneratedNode* CurrentChildNode = CurrentClose->ChildNodes[Index];
+				
+				CurrentChildNode->Score = CurrentChildNode->ParentNode->Score + 1;
+
+				FGeneratedNode* SameClosedNode = nullptr;
+				
+
+				for (int CloseIndex = 0; CloseIndex < Close.Num(); ++CloseIndex)
+				{
+					if (Close[CloseIndex].NodePosition == CurrentChildNode->NodePosition)
+					{
+						SameClosedNode = &Close[CloseIndex];
+					}
+				}
+
+				if (SameClosedNode != nullptr)
+				{
+					FGeneratedNode* SameOpenNode = nullptr;
+					int OpenSameIndex = 0;
+
+					for (OpenSameIndex = 0; OpenSameIndex < Open.Num(); ++OpenSameIndex)
+					{
+						if (Open[OpenSameIndex].NodePosition == CurrentChildNode->NodePosition)
+						{
+							SameOpenNode = &Open[OpenSameIndex];
+						}
+					}
+
+					if(SameOpenNode != nullptr)
+					{
+						if (SameOpenNode->Score > CurrentChildNode->Score)
+						{
+							Open[OpenSameIndex].ParentNode = CurrentChildNode->ParentNode;
+						}
+					}
+				 
+				}
+				else
+				{
+					CurrentChildNode->ParentNode = CurrentClose;
+					Open.Add(*CurrentChildNode);
 				}
 			}
 		}
@@ -463,6 +581,21 @@ void AMapGenerator::DrawDebugPathGenerated()
 			DrawDebugLine(World, PathPoint, NexPathPoint, RandomColor, true);
 		}
 	}
+
+	for (int Index = Routes.Num() - 1; Index >= 0; --Index)
+	{
+		FVector PathPoint = FVector(Routes[Index].NodePosition.X, Routes[Index].NodePosition.Y, 1.0f);
+		DrawDebugSphere(World, PathPoint, 0.1f, 10, FColor::Black, true);
+
+		if (Index > 0)
+		{
+			FVector PrevPathPoint = FVector(Routes[Index - 1].NodePosition.X, Routes[Index - 1].NodePosition.Y, 1.0f);
+			DrawDebugLine(World, PathPoint, PrevPathPoint, FColor::Black, true);
+		}
+
+	}
+
+
 }
 
 // Called every frame
